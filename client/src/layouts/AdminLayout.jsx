@@ -85,6 +85,11 @@ const AdminLayout = () => {
       path: '/admin/farmers',
     },
     {
+      text: 'Govt Schemes',
+      icon: <DescriptionIcon />,
+      path: '/admin/schemes',
+    },
+    {
       text: 'Analytics',
       icon: <BarChartIcon />,
       path: '/admin/analytics',
@@ -187,16 +192,16 @@ const AdminLayout = () => {
             }),
             ...(!open &&
               !isMobile && {
-                overflowX: 'hidden',
-                transition: theme.transitions.create('width', {
-                  easing: theme.transitions.easing.sharp,
-                  duration: theme.transitions.duration.leavingScreen,
-                }),
-                width: theme.spacing(7),
-                [theme.breakpoints.up('sm')]: {
-                  width: theme.spacing(9),
-                },
+              overflowX: 'hidden',
+              transition: theme.transitions.create('width', {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.leavingScreen,
               }),
+              width: theme.spacing(7),
+              [theme.breakpoints.up('sm')]: {
+                width: theme.spacing(9),
+              },
+            }),
           },
         }}
       >
@@ -248,8 +253,7 @@ const AdminLayout = () => {
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { sm: `calc(100% - ${open ? drawerWidth : 0}px)` },
-          ml: { sm: `${open ? drawerWidth : 0}px` },
+          width: '100%',
           transition: theme.transitions.create(['width', 'margin'], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,

@@ -1,6 +1,9 @@
 const jwt = require('jsonwebtoken');
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
+const Admin = require('../models/Admin');
+const Executive = require('../models/Executive');
+const Farmer = require('../models/Farmer');
 
 /**
  * Middleware to protect routes - verifies JWT token and attaches user to request
@@ -32,18 +35,40 @@ exports.protect = asyncHandler(async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Attach user to request
-    req.user = await User.findById(decoded.id).select('-password');
+    // Attach user to request based on role
+    let user = null;
 
-    if (!req.user) {
+    if (decoded.role === 'admin') {
+      user = await Admin.findById(decoded.id).select('-password');
+      if (user) {
+        user.role = 'admin';
+      }
+    } else if (decoded.role === 'executive') {
+      user = await Executive.findById(decoded.id).select('-password');
+      if (user) {
+        user.role = 'executive';
+      }
+    } else if (decoded.role === 'farmer') {
+      user = await Farmer.findById(decoded.id).select('-password');
+      if (user) {
+        user.role = 'farmer';
+      }
+    } else {
+      // Fallback to User model
+      user = await User.findById(decoded.id).select('-password');
+    }
+
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: 'User not found',
       });
     }
 
-    // Check if user is active
-    if (!req.user.isActive) {
+    req.user = user;
+
+    // Check if user is active (only if the model has isActive field)
+    if (user.isActive !== undefined && !user.isActive) {
       return res.status(401).json({
         success: false,
         message: 'Your account has been deactivated. Please contact support.',
@@ -112,9 +137,9 @@ exports.checkOwnership = (model, paramId = 'id') => {
     // Check if user is the owner of the resource
     // This assumes the resource has a 'user' or 'farmer' or 'executive' field
     // that references the user who owns it
-    const ownerId = 
-      resource.user?.toString() || 
-      resource.farmer?.toString() || 
+    const ownerId =
+      resource.user?.toString() ||
+      resource.farmer?.toString() ||
       resource.executive?.toString();
 
     if (ownerId !== req.user.id) {

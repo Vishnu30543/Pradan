@@ -77,6 +77,8 @@ const FarmerOverview = () => {
   }
 
   // For demo purposes, simulate API response with mock data
+  // For demo purposes, simulate API response with mock data
+  /*
   useEffect(() => {
     const simulateApiResponse = () => {
       setTimeout(() => {
@@ -152,7 +154,7 @@ const FarmerOverview = () => {
               _id: '3',
               name: 'Robert Johnson',
               region: 'East',
-            },
+              },
             createdAt: '2023-03-20T09:15:00.000Z',
             fieldStatus: {
               health: 'red',
@@ -221,6 +223,7 @@ const FarmerOverview = () => {
     // In production, use the actual API call
     // fetchFarmers()
   }, [])
+  */
 
   const handleDeleteFarmer = async () => {
     if (!selectedFarmer) return
@@ -228,7 +231,7 @@ const FarmerOverview = () => {
     try {
       setLoading(true)
       await axios.delete(`/api/admin/farmer/${selectedFarmer._id}`)
-      
+
       // Update the local state by filtering out the deleted farmer
       setFarmers(farmers.filter(farmer => farmer._id !== selectedFarmer._id))
       setOpenDeleteDialog(false)
@@ -253,7 +256,7 @@ const FarmerOverview = () => {
   const handleGenerateReport = async () => {
     try {
       const response = await axios.post('/api/admin/farmer-report', {}, { responseType: 'blob' })
-      
+
       // Create a blob URL and trigger download
       const url = window.URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement('a')
@@ -283,33 +286,33 @@ const FarmerOverview = () => {
   // Filter farmers based on search term, region, and tab value
   const filteredFarmers = farmers.filter((farmer) => {
     const matchesSearch =
-      farmer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      farmer.mobileNo.includes(searchTerm) ||
-      farmer.village.toLowerCase().includes(searchTerm.toLowerCase())
+      farmer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      farmer.mobileNo?.includes(searchTerm) ||
+      farmer.village?.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesRegion = filterRegion
-      ? farmer.assignedExecutive.region === filterRegion
+      ? farmer.assignedExecutive?.region === filterRegion
       : true
 
     const matchesTab =
       (tabValue === 0) || // All
-      (tabValue === 1 && farmer.fieldStatus.health === 'green') || // Healthy
-      (tabValue === 2 && farmer.fieldStatus.health === 'yellow') || // Warning
-      (tabValue === 3 && farmer.fieldStatus.health === 'red') || // Critical
+      (tabValue === 1 && (farmer.fieldStatus?.healthStatus === 'green' || farmer.fieldStatus?.health === 'green')) || // Healthy
+      (tabValue === 2 && (farmer.fieldStatus?.healthStatus === 'yellow' || farmer.fieldStatus?.health === 'yellow')) || // Warning
+      (tabValue === 3 && (farmer.fieldStatus?.healthStatus === 'red' || farmer.fieldStatus?.health === 'red')) || // Critical
       (tabValue === 4 && farmer.womenFarmer) // Women Farmers
 
     return matchesSearch && matchesRegion && matchesTab
   })
 
   // Get unique regions for filter
-  const regions = [...new Set(farmers.map((farmer) => farmer.assignedExecutive.region))]
+  const regions = [...new Set(farmers.map((farmer) => farmer.assignedExecutive?.region).filter(Boolean))]
 
   // Calculate statistics
   const totalFarmers = farmers.length
   const womenFarmers = farmers.filter((farmer) => farmer.womenFarmer).length
-  const healthyFields = farmers.filter((farmer) => farmer.fieldStatus.health === 'green').length
-  const warningFields = farmers.filter((farmer) => farmer.fieldStatus.health === 'yellow').length
-  const criticalFields = farmers.filter((farmer) => farmer.fieldStatus.health === 'red').length
+  const healthyFields = farmers.filter((farmer) => farmer.fieldStatus?.healthStatus === 'green' || farmer.fieldStatus?.health === 'green').length
+  const warningFields = farmers.filter((farmer) => farmer.fieldStatus?.healthStatus === 'yellow' || farmer.fieldStatus?.health === 'yellow').length
+  const criticalFields = farmers.filter((farmer) => farmer.fieldStatus?.healthStatus === 'red' || farmer.fieldStatus?.health === 'red').length
   const averageIncome = farmers.length > 0
     ? Math.round(farmers.reduce((sum, farmer) => sum + farmer.income, 0) / farmers.length)
     : 0
@@ -520,71 +523,78 @@ const FarmerOverview = () => {
             </TableHead>
             <TableBody>
               {filteredFarmers.length > 0 ? (
-                filteredFarmers.map((farmer) => (
-                  <TableRow key={farmer._id}>
-                    <TableCell>
-                      {farmer.name}
-                      {farmer.womenFarmer && (
+                filteredFarmers.map((farmer) => {
+                  const healthStatus = (typeof farmer.fieldStatus === 'string' ? farmer.fieldStatus : (farmer.fieldStatus?.healthStatus || farmer.fieldStatus?.health)) || 'unknown';
+                  const crops = farmer.crops || farmer.plants || [];
+
+                  return (
+                    <TableRow key={farmer._id}>
+                      <TableCell>
+                        {farmer.name}
+                        {farmer.womenFarmer && (
+                          <Chip
+                            label="W"
+                            size="small"
+                            color="secondary"
+                            sx={{ ml: 1, height: 20, width: 20 }}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell>{farmer.mobileNo}</TableCell>
+                      <TableCell>{farmer.village}</TableCell>
+                      <TableCell>
+                        {crops.map((crop) => (
+                          <Chip
+                            key={crop}
+                            label={crop}
+                            size="small"
+                            variant="outlined"
+                            sx={{ mr: 0.5, mb: 0.5 }}
+                          />
+                        ))}
+                      </TableCell>
+                      <TableCell>
                         <Chip
-                          label="W"
+                          label={healthStatus.toUpperCase()}
                           size="small"
-                          color="secondary"
-                          sx={{ ml: 1, height: 20, width: 20 }}
+                          sx={{
+                            bgcolor:
+                              healthStatus === 'green' || healthStatus === 'healthy'
+                                ? 'success.main'
+                                : healthStatus === 'yellow' || healthStatus === 'moderate'
+                                  ? 'warning.main'
+                                  : healthStatus === 'red' || healthStatus === 'critical'
+                                    ? 'error.main'
+                                    : 'grey.500',
+                            color: 'white',
+                          }}
                         />
-                      )}
-                    </TableCell>
-                    <TableCell>{farmer.mobileNo}</TableCell>
-                    <TableCell>{farmer.village}</TableCell>
-                    <TableCell>
-                      {farmer.crops.map((crop) => (
-                        <Chip
-                          key={crop}
-                          label={crop}
-                          size="small"
-                          variant="outlined"
-                          sx={{ mr: 0.5, mb: 0.5 }}
-                        />
-                      ))}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={farmer.fieldStatus.health.toUpperCase()}
-                        size="small"
-                        sx={{
-                          bgcolor:
-                            farmer.fieldStatus.health === 'green'
-                              ? 'success.main'
-                              : farmer.fieldStatus.health === 'yellow'
-                              ? 'warning.main'
-                              : 'error.main',
-                          color: 'white',
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>₹{farmer.income.toLocaleString()}</TableCell>
-                    <TableCell>{farmer.assignedExecutive.name}</TableCell>
-                    <TableCell align="center">
-                      <IconButton
-                        color="primary"
-                        onClick={() => {
-                          setSelectedFarmer(farmer)
-                          setOpenViewDialog(true)
-                        }}
-                      >
-                        <VisibilityIcon />
-                      </IconButton>
-                      <IconButton
-                        color="error"
-                        onClick={() => {
-                          setSelectedFarmer(farmer)
-                          setOpenDeleteDialog(true)
-                        }}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      </TableCell>
+                      <TableCell>₹{(farmer.income || 0).toLocaleString()}</TableCell>
+                      <TableCell>{farmer.assignedExecutive?.name || 'Unassigned'}</TableCell>
+                      <TableCell align="center">
+                        <IconButton
+                          color="primary"
+                          onClick={() => {
+                            setSelectedFarmer({ ...farmer, safeCrops: crops, safeHealth: healthStatus }) // Pass safe values
+                            setOpenViewDialog(true)
+                          }}
+                        >
+                          <VisibilityIcon />
+                        </IconButton>
+                        <IconButton
+                          color="error"
+                          onClick={() => {
+                            setSelectedFarmer(farmer)
+                            setOpenDeleteDialog(true)
+                          }}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={8} align="center">
@@ -627,74 +637,76 @@ const FarmerOverview = () => {
                 </Grid>
                 <Grid item xs={12} md={6} sx={{ textAlign: 'right' }}>
                   <Chip
-                    label={`Field Status: ${selectedFarmer.fieldStatus.health.toUpperCase()}`}
+                    label={`Field Status: ${(selectedFarmer.safeHealth || 'unknown').toUpperCase()}`}
                     sx={{
                       bgcolor:
-                        selectedFarmer.fieldStatus.health === 'green'
+                        selectedFarmer.safeHealth === 'green' || selectedFarmer.safeHealth === 'healthy'
                           ? 'success.main'
-                          : selectedFarmer.fieldStatus.health === 'yellow'
-                          ? 'warning.main'
-                          : 'error.main',
+                          : selectedFarmer.safeHealth === 'yellow' || selectedFarmer.safeHealth === 'moderate'
+                            ? 'warning.main'
+                            : 'error.main',
                       color: 'white',
                     }}
                   />
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Last Updated: {new Date(selectedFarmer.fieldStatus.lastUpdated).toLocaleDateString()}
-                  </Typography>
+                  {typeof selectedFarmer.fieldStatus === 'object' && selectedFarmer.fieldStatus?.lastUpdated && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Last Updated: {new Date(selectedFarmer.fieldStatus.lastUpdated).toLocaleDateString()}
+                    </Typography>
+                  )}
                 </Grid>
-                
+
                 <Grid item xs={12}>
                   <Divider sx={{ my: 2 }} />
                 </Grid>
-                
+
                 <Grid item xs={12} sm={6} md={4}>
                   <Typography variant="subtitle2">Contact Information</Typography>
                   <Typography variant="body2">Mobile: {selectedFarmer.mobileNo}</Typography>
                   <Typography variant="body2">Email: {selectedFarmer.email}</Typography>
                 </Grid>
-                
+
                 <Grid item xs={12} sm={6} md={4}>
                   <Typography variant="subtitle2">Location</Typography>
                   <Typography variant="body2">Village: {selectedFarmer.village}</Typography>
                   <Typography variant="body2">Panchayat: {selectedFarmer.panchayat}</Typography>
                 </Grid>
-                
+
                 <Grid item xs={12} sm={6} md={4}>
                   <Typography variant="subtitle2">Demographics</Typography>
                   <Typography variant="body2">Caste: {selectedFarmer.caste}</Typography>
                   <Typography variant="body2">Group: {selectedFarmer.group}</Typography>
                 </Grid>
-                
+
                 <Grid item xs={12}>
                   <Divider sx={{ my: 2 }} />
                 </Grid>
-                
+
                 <Grid item xs={12} sm={6} md={4}>
                   <Typography variant="subtitle2">Financial Information</Typography>
                   <Typography variant="body2">Credit Score: {selectedFarmer.creditScore}</Typography>
-                  <Typography variant="body2">Current Income: ₹{selectedFarmer.income.toLocaleString()}</Typography>
-                  <Typography variant="body2">Estimated Income: ₹{selectedFarmer.estimatedIncome.toLocaleString()}</Typography>
+                  <Typography variant="body2">Current Income: ₹{(selectedFarmer.income || 0).toLocaleString()}</Typography>
+                  <Typography variant="body2">Estimated Income: ₹{(selectedFarmer.estimatedIncome || 0).toLocaleString()}</Typography>
                 </Grid>
-                
+
                 <Grid item xs={12} sm={6} md={4}>
                   <Typography variant="subtitle2">Crops</Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                    {selectedFarmer.crops.map((crop) => (
+                    {(selectedFarmer.safeCrops || []).map((crop) => (
                       <Chip key={crop} label={crop} size="small" />
                     ))}
                   </Box>
                 </Grid>
-                
+
                 <Grid item xs={12} sm={6} md={4}>
                   <Typography variant="subtitle2">Executive Information</Typography>
-                  <Typography variant="body2">Name: {selectedFarmer.assignedExecutive.name}</Typography>
-                  <Typography variant="body2">Region: {selectedFarmer.assignedExecutive.region}</Typography>
+                  <Typography variant="body2">Name: {selectedFarmer.assignedExecutive?.name || 'Unassigned'}</Typography>
+                  <Typography variant="body2">Region: {selectedFarmer.assignedExecutive?.region || 'N/A'}</Typography>
                 </Grid>
-                
+
                 <Grid item xs={12}>
                   <Divider sx={{ my: 2 }} />
                 </Grid>
-                
+
                 <Grid item xs={12}>
                   <Typography variant="body2" color="text.secondary">
                     Registered on: {new Date(selectedFarmer.createdAt).toLocaleDateString()}

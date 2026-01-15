@@ -62,13 +62,14 @@ export const AuthProvider = ({ children }) => {
       // Call appropriate login endpoint based on role
       if (userRole === 'admin') {
         response = await axios.post('/api/admin/login', credentials)
-        // /api/admin/login
       } else if (userRole === 'executive') {
         response = await axios.post('/api/executive/login', credentials)
       } else if (userRole === 'farmer') {
-        // For farmer, we would need a login endpoint
-        // This is a placeholder for the actual API call
-        response = await axios.post('/api/farmer/login', credentials)
+        // Use the central auth login endpoint with role
+        response = await axios.post('/api/auth/login', {
+          ...credentials,
+          role: 'farmer'
+        })
       }
 
       // Save token and role to localStorage and state
@@ -83,7 +84,7 @@ export const AuthProvider = ({ children }) => {
       } else if (userRole === 'executive') {
         setUser({ ...response.data.executive, role: 'executive' })
       } else if (userRole === 'farmer') {
-        setUser({ ...response.data.farmer, role: 'farmer' })
+        setUser({ ...response.data.user, role: 'farmer' })
       }
 
       // Redirect based on role

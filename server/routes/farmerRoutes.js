@@ -5,8 +5,10 @@ const farmerController = require('../controllers/farmerController');
 const requestController = require('../controllers/requestController');
 const fieldController = require('../controllers/fieldController');
 const governmentSchemeController = require('../controllers/governmentSchemeController');
+const legacyFileUpload = require('../middleware/legacyFileUpload');
 
 // Protect all routes
+router.use(legacyFileUpload);
 router.use(protect);
 router.use(authorize('farmer'));
 
@@ -21,9 +23,9 @@ router.get('/notifications', farmerController.getNotifications);
 // Field routes
 router.get('/fields', fieldController.getFarmerFields);
 router.get('/fields/:id', fieldController.getFieldById);
-router.post('/field-photos', fieldController.uploadFieldPhoto);
+router.post('/field-photos', farmerController.uploadFieldPhotos);
 router.get('/field-photos', fieldController.getFieldPhotos);
-router.delete('/field-photos/:id', fieldController.deleteFieldPhoto);
+router.delete('/field-photos/:id', farmerController.deleteFieldPhoto);
 
 // Request routes
 router.get('/requests', requestController.getFarmerRequests);

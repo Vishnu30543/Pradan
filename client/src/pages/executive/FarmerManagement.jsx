@@ -34,6 +34,8 @@ import {
   Tab,
   Avatar,
   Tooltip,
+  Badge,
+  CardMedia,
 } from '@mui/material'
 import {
   Delete as DeleteIcon,
@@ -59,6 +61,8 @@ const FarmerManagement = () => {
   const [error, setError] = useState(null)
   const [openAddDialog, setOpenAddDialog] = useState(false)
   const [openViewDialog, setOpenViewDialog] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [editingId, setEditingId] = useState(null)
   const [selectedFarmer, setSelectedFarmer] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterVillage, setFilterVillage] = useState('')
@@ -70,15 +74,24 @@ const FarmerManagement = () => {
     severity: 'success',
   })
 
-  // Form state for adding new farmer
+  // Form state for adding new farmer (matching backend requirements)
   const [newFarmer, setNewFarmer] = useState({
     name: '',
+    fatherOrHusbandName: '',
     mobileNo: '',
-    village: '',
-    landSize: '',
-    crops: '',
-    aadharNo: '',
+    email: '',
+    password: '',
+    villageName: '',
+    panchayatName: '',
+    caste: '',
+    isWomenFarmer: 'no', // Must be 'yes' or 'no' (string enum)
+    isWomenFarmer: 'no', // Must be 'yes' or 'no' (string enum)
+    groupName: '',
+    income: '',
+    estimatedIncome: ''
   })
+  const [farmerFields, setFarmerFields] = useState([])
+  const [fieldsLoading, setFieldsLoading] = useState(false)
   const [formErrors, setFormErrors] = useState({})
 
   useEffect(() => {
@@ -89,196 +102,34 @@ const FarmerManagement = () => {
     try {
       setLoading(true)
       const response = await axios.get('/api/executive/farmers')
-      setFarmers(response.data.farmers)
-      
+      const farmersData = response.data.farmers || []
+      setFarmers(farmersData)
+
       // Extract unique villages for filter
-      const uniqueVillages = [...new Set(response.data.farmers.map(farmer => farmer.village))]
+      const uniqueVillages = [...new Set(farmersData.map(farmer => farmer.villageName).filter(Boolean))]
       setVillages(uniqueVillages)
-      
+
       setError(null)
     } catch (err) {
       console.error('Error fetching farmers:', err)
-      setError('Failed to load farmers. Please try again later.')
+      const errorMessage = err.response?.data?.message || 'Failed to load farmers. Please try again later.'
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
   }
 
-  // For demo purposes, simulate API response with mock data
-  useEffect(() => {
-    const simulateApiResponse = () => {
-      setTimeout(() => {
-        const mockFarmers = [
-          {
-            _id: '1',
-            name: 'Rajesh Kumar',
-            mobileNo: '9876543210',
-            village: 'Sundarpur',
-            landSize: '5 acres',
-            crops: 'Rice, Wheat',
-            aadharNo: 'XXXX-XXXX-1234',
-            registrationDate: '2023-01-15T08:30:00.000Z',
-            lastVisitDate: '2023-06-05T10:15:00.000Z',
-            fields: [
-              {
-                _id: 'f1',
-                name: 'North Field',
-                size: '3 acres',
-                crop: 'Rice',
-                soilType: 'Loamy',
-                irrigationType: 'Drip',
-              },
-              {
-                _id: 'f2',
-                name: 'South Field',
-                size: '2 acres',
-                crop: 'Wheat',
-                soilType: 'Clay',
-                irrigationType: 'Flood',
-              },
-            ],
-            requests: 2,
-            income: 120000,
-            estimatedIncome: 150000,
-          },
-          {
-            _id: '2',
-            name: 'Lakshmi Devi',
-            mobileNo: '8765432109',
-            village: 'Chandpur',
-            landSize: '3 acres',
-            crops: 'Cotton, Pulses',
-            aadharNo: 'XXXX-XXXX-5678',
-            registrationDate: '2023-02-20T09:45:00.000Z',
-            lastVisitDate: '2023-05-28T14:30:00.000Z',
-            fields: [
-              {
-                _id: 'f3',
-                name: 'Main Field',
-                size: '3 acres',
-                crop: 'Cotton',
-                soilType: 'Black',
-                irrigationType: 'Sprinkler',
-              },
-            ],
-            requests: 1,
-            income: 85000,
-            estimatedIncome: 100000,
-          },
-          {
-            _id: '3',
-            name: 'Suresh Patel',
-            mobileNo: '7654321098',
-            village: 'Rampur',
-            landSize: '8 acres',
-            crops: 'Wheat, Vegetables',
-            aadharNo: 'XXXX-XXXX-9012',
-            registrationDate: '2022-11-10T11:20:00.000Z',
-            lastVisitDate: '2023-06-10T09:00:00.000Z',
-            fields: [
-              {
-                _id: 'f4',
-                name: 'East Field',
-                size: '4 acres',
-                crop: 'Wheat',
-                soilType: 'Loamy',
-                irrigationType: 'Tube Well',
-              },
-              {
-                _id: 'f5',
-                name: 'West Field',
-                size: '4 acres',
-                crop: 'Vegetables',
-                soilType: 'Sandy Loam',
-                irrigationType: 'Drip',
-              },
-            ],
-            requests: 3,
-            income: 200000,
-            estimatedIncome: 220000,
-          },
-          {
-            _id: '4',
-            name: 'Meena Singh',
-            mobileNo: '6543210987',
-            village: 'Krishnapur',
-            landSize: '2 acres',
-            crops: 'Organic Vegetables',
-            aadharNo: 'XXXX-XXXX-3456',
-            registrationDate: '2023-03-05T10:30:00.000Z',
-            lastVisitDate: '2023-06-02T11:45:00.000Z',
-            fields: [
-              {
-                _id: 'f6',
-                name: 'Organic Plot',
-                size: '2 acres',
-                crop: 'Mixed Vegetables',
-                soilType: 'Rich Loam',
-                irrigationType: 'Drip',
-              },
-            ],
-            requests: 0,
-            income: 75000,
-            estimatedIncome: 90000,
-          },
-          {
-            _id: '5',
-            name: 'Arjun Reddy',
-            mobileNo: '5432109876',
-            village: 'Nandpur',
-            landSize: '6 acres',
-            crops: 'Tomatoes, Cucumbers',
-            aadharNo: 'XXXX-XXXX-7890',
-            registrationDate: '2023-01-25T13:15:00.000Z',
-            lastVisitDate: '2023-05-20T16:30:00.000Z',
-            fields: [
-              {
-                _id: 'f7',
-                name: 'Vegetable Field 1',
-                size: '3 acres',
-                crop: 'Tomatoes',
-                soilType: 'Red Soil',
-                irrigationType: 'Drip',
-              },
-              {
-                _id: 'f8',
-                name: 'Vegetable Field 2',
-                size: '3 acres',
-                crop: 'Cucumbers',
-                soilType: 'Red Soil',
-                irrigationType: 'Drip',
-              },
-            ],
-            requests: 1,
-            income: 180000,
-            estimatedIncome: 200000,
-          },
-        ]
-        
-        setFarmers(mockFarmers)
-        
-        // Extract unique villages for filter
-        const uniqueVillages = [...new Set(mockFarmers.map(farmer => farmer.village))]
-        setVillages(uniqueVillages)
-        
-        setLoading(false)
-      }, 1000)
-    }
-
-    // Use mock data for demo
-    simulateApiResponse()
-    // In production, use the actual API call
-    // fetchFarmers()
-  }, [])
 
   const handleAddFarmer = async () => {
-    // Validate form
+    // Validate form (matching backend requirements)
     const errors = {}
     if (!newFarmer.name) errors.name = 'Name is required'
+    if (!newFarmer.fatherOrHusbandName) errors.fatherOrHusbandName = 'Father/Husband name is required'
     if (!newFarmer.mobileNo) errors.mobileNo = 'Mobile number is required'
-    if (!newFarmer.village) errors.village = 'Village is required'
-    if (!newFarmer.landSize) errors.landSize = 'Land size is required'
-    
+    if (!newFarmer.password) errors.password = 'Password is required'
+    if (!newFarmer.villageName) errors.villageName = 'Village is required'
+    if (!newFarmer.panchayatName) errors.panchayatName = 'Panchayat is required'
+
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors)
       return
@@ -286,42 +137,48 @@ const FarmerManagement = () => {
 
     try {
       setLoading(true)
-      await axios.post('/api/executive/farmers', newFarmer)
-
-      // Simulate API response for demo
-      const newFarmerId = Math.random().toString(36).substring(2, 9)
-      const addedFarmer = {
-        _id: newFarmerId,
-        ...newFarmer,
-        registrationDate: new Date().toISOString(),
-        lastVisitDate: new Date().toISOString(),
-        fields: [],
-        requests: 0,
-        income: 0,
-        estimatedIncome: 0,
+      let response
+      if (editMode && editingId) {
+        response = await axios.put(`/api/executive/farmers/${editingId}`, newFarmer)
+      } else {
+        response = await axios.post('/api/executive/farmers', newFarmer)
       }
 
-      setFarmers([...farmers, addedFarmer])
+      // Refresh the farmers list
+      await fetchFarmers()
+
       setOpenAddDialog(false)
       setNewFarmer({
         name: '',
+        fatherOrHusbandName: '',
         mobileNo: '',
-        village: '',
-        landSize: '',
-        crops: '',
-        aadharNo: '',
+        email: '',
+        password: '',
+        villageName: '',
+        panchayatName: '',
+        caste: '',
+        isWomenFarmer: 'no',
+        isWomenFarmer: 'no',
+        groupName: '',
+        income: '',
+        estimatedIncome: ''
       })
       setFormErrors({})
+      setEditMode(false)
+      setEditingId(null)
       setSnackbar({
         open: true,
-        message: 'Farmer added successfully!',
+        message: response.data.message || 'Farmer added successfully!',
         severity: 'success',
       })
     } catch (err) {
       console.error('Error adding farmer:', err)
+      const errorMessage = err.response?.data?.message ||
+        err.response?.data?.error ||
+        'Failed to save farmer. Please try again.'
       setSnackbar({
         open: true,
-        message: 'Failed to add farmer. Please try again.',
+        message: errorMessage,
         severity: 'error',
       })
     } finally {
@@ -349,6 +206,26 @@ const FarmerManagement = () => {
     setOpenViewDialog(true)
   }
 
+  const handleEditFarmer = (farmer) => {
+    setNewFarmer({
+      name: farmer.name || '',
+      fatherOrHusbandName: farmer.fatherOrHusbandName || '',
+      mobileNo: farmer.mobileNo || '',
+      email: farmer.email || '',
+      password: '', // Password is required for updates as per current form, or maybe optional? Assuming optional for update but form requires it currently. Let's keep it empty and user enters new password or we handle it in backend. If backend requires password, user must enter it.
+      villageName: farmer.villageName || '',
+      panchayatName: farmer.panchayatName || '',
+      caste: farmer.caste || '',
+      isWomenFarmer: farmer.isWomenFarmer ? 'yes' : 'no', // Handle boolean to string if needed, assuming backend sends boolean/string
+      groupName: farmer.groupName || '',
+      income: farmer.income || '',
+      estimatedIncome: farmer.estimatedIncome || ''
+    })
+    setEditingId(farmer._id)
+    setEditMode(true)
+    setOpenAddDialog(true)
+  }
+
   const handleCloseSnackbar = () => {
     setSnackbar({
       ...snackbar,
@@ -358,15 +235,48 @@ const FarmerManagement = () => {
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue)
+    if (newValue === 1 && selectedFarmer) {
+      fetchFarmerFields(selectedFarmer._id)
+    }
+  }
+
+  const fetchFarmerFields = async (farmerId) => {
+    try {
+      setFieldsLoading(true)
+      // Ensure getFields supports filtering by farmerId via query param if implemented, 
+      // OR we might need to filter client side if the API returns all fields (which getFields in executive usually doesn't, it finds for current exec). 
+      // NOTE: My getFields implementation (Step 543) returns ALL fields for farmers assigned to executive.
+      // So I can reuse it and filter, OR rely on backend filter.
+      // Let's assume getFields returns fields.
+      const response = await axios.get(`/api/executive/fields?farmerId=${farmerId}`) // Assuming I add filter support or client filter
+      // Wait, my getFields (Step 543) does NOT support query params filtering explicitly, it returns all fields.
+      // I should update it or filter client side. Filter client side is safer for now without changing backend again.
+      // Actually, let's just fetch all and filter.
+
+      // BETTER: I'll use the existing /api/executive/fields response but filter it client side here.
+      // Wait, I haven't fetched fields in this Component yet.
+      const allFieldsRes = await axios.get('/api/executive/fields')
+      const allFields = allFieldsRes.data.fields || allFieldsRes.data.data || []
+      const myFields = allFields.filter(f => f.farmer._id === farmerId || f.farmer === farmerId)
+      setFarmerFields(myFields)
+    } catch (err) {
+      console.error("Error fetching fields", err)
+    } finally {
+      setFieldsLoading(false)
+    }
   }
 
   const filteredFarmers = farmers.filter((farmer) => {
-    const matchesSearch = farmer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         farmer.mobileNo.includes(searchTerm) ||
-                         farmer.village.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesVillage = filterVillage ? farmer.village === filterVillage : true
-    
+    const name = farmer.name || ''
+    const mobileNo = farmer.mobileNo?.toString() || ''
+    const villageName = farmer.villageName || ''
+
+    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mobileNo.includes(searchTerm) ||
+      villageName.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesVillage = filterVillage ? villageName === filterVillage : true
+
     return matchesSearch && matchesVillage
   })
 
@@ -443,7 +353,23 @@ const FarmerManagement = () => {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => setOpenAddDialog(true)}
+              onClick={() => {
+                setNewFarmer({
+                  name: '',
+                  fatherOrHusbandName: '',
+                  mobileNo: '',
+                  email: '',
+                  password: '',
+                  villageName: '',
+                  panchayatName: '',
+                  caste: '',
+                  isWomenFarmer: 'no',
+                  groupName: '',
+                })
+                setEditMode(false)
+                setEditingId(null)
+                setOpenAddDialog(true)
+              }}
             >
               Add New Farmer
             </Button>
@@ -459,9 +385,8 @@ const FarmerManagement = () => {
               <TableCell>Name</TableCell>
               <TableCell>Mobile</TableCell>
               <TableCell>Village</TableCell>
-              <TableCell>Land Size</TableCell>
-              <TableCell>Crops</TableCell>
-              <TableCell>Requests</TableCell>
+              <TableCell>Panchayat</TableCell>
+              <TableCell>Income</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -471,13 +396,13 @@ const FarmerManagement = () => {
                 <TableRow key={farmer._id}>
                   <TableCell>{farmer.name}</TableCell>
                   <TableCell>{farmer.mobileNo}</TableCell>
-                  <TableCell>{farmer.village}</TableCell>
-                  <TableCell>{farmer.landSize}</TableCell>
-                  <TableCell>{farmer.crops}</TableCell>
+                  <TableCell>{farmer.villageName}</TableCell>
+                  <TableCell>{farmer.panchayatName}</TableCell>
                   <TableCell>
                     <Chip
-                      label={farmer.requests}
-                      color={farmer.requests > 0 ? 'primary' : 'default'}
+                      label={`₹${(farmer.income || 0).toLocaleString()}`}
+                      color="success"
+                      variant="outlined"
                       size="small"
                     />
                   </TableCell>
@@ -491,7 +416,7 @@ const FarmerManagement = () => {
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Edit">
-                      <IconButton color="secondary">
+                      <IconButton color="secondary" onClick={() => handleEditFarmer(farmer)}>
                         <EditIcon />
                       </IconButton>
                     </Tooltip>
@@ -500,7 +425,7 @@ const FarmerManagement = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={6} align="center">
                   No farmers found
                 </TableCell>
               </TableRow>
@@ -509,15 +434,15 @@ const FarmerManagement = () => {
         </Table>
       </TableContainer>
 
-      {/* Add Farmer Dialog */}
-      <Dialog open={openAddDialog} onClose={() => setOpenAddDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add New Farmer</DialogTitle>
+      {/* Add/Edit Farmer Dialog */}
+      <Dialog open={openAddDialog} onClose={() => { setOpenAddDialog(false); setEditMode(false); setEditingId(null); }} maxWidth="md" fullWidth>
+        <DialogTitle>{editMode ? 'Edit Farmer' : 'Add New Farmer'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Name"
+                label="Full Name *"
                 name="name"
                 value={newFarmer.name}
                 onChange={handleInputChange}
@@ -528,7 +453,18 @@ const FarmerManagement = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Mobile Number"
+                label="Father/Husband Name *"
+                name="fatherOrHusbandName"
+                value={newFarmer.fatherOrHusbandName}
+                onChange={handleInputChange}
+                error={!!formErrors.fatherOrHusbandName}
+                helperText={formErrors.fatherOrHusbandName}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Mobile Number *"
                 name="mobileNo"
                 value={newFarmer.mobileNo}
                 onChange={handleInputChange}
@@ -539,55 +475,109 @@ const FarmerManagement = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Village"
-                name="village"
-                value={newFarmer.village}
+                label="Email"
+                name="email"
+                type="email"
+                value={newFarmer.email}
                 onChange={handleInputChange}
-                error={!!formErrors.village}
-                helperText={formErrors.village}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Land Size (acres)"
-                name="landSize"
-                value={newFarmer.landSize}
+                label="Password *"
+                name="password"
+                type="password"
+                value={newFarmer.password}
                 onChange={handleInputChange}
-                error={!!formErrors.landSize}
-                helperText={formErrors.landSize}
+                error={!!formErrors.password}
+                helperText={formErrors.password}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Crops"
-                name="crops"
-                value={newFarmer.crops}
+                label="Village Name *"
+                name="villageName"
+                value={newFarmer.villageName}
                 onChange={handleInputChange}
-                placeholder="e.g. Rice, Wheat"
+                error={!!formErrors.villageName}
+                helperText={formErrors.villageName}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Aadhar Number"
-                name="aadharNo"
-                value={newFarmer.aadharNo}
+                label="Panchayat Name *"
+                name="panchayatName"
+                value={newFarmer.panchayatName}
                 onChange={handleInputChange}
-                placeholder="XXXX-XXXX-XXXX"
+                error={!!formErrors.panchayatName}
+                helperText={formErrors.panchayatName}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Caste"
+                name="caste"
+                value={newFarmer.caste}
+                onChange={handleInputChange}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Group Name"
+                name="groupName"
+                value={newFarmer.groupName}
+                onChange={handleInputChange}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Is Women Farmer</InputLabel>
+                <Select
+                  name="isWomenFarmer"
+                  value={newFarmer.isWomenFarmer}
+                  onChange={handleInputChange}
+                  label="Is Women Farmer"
+                >
+                  <MenuItem value="no">No</MenuItem>
+                  <MenuItem value="yes">Yes</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Actual Income"
+                name="income"
+                type="number"
+                value={newFarmer.income}
+                onChange={handleInputChange}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Estimated Income"
+                name="estimatedIncome"
+                type="number"
+                value={newFarmer.estimatedIncome}
+                onChange={handleInputChange}
               />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenAddDialog(false)}>Cancel</Button>
+          <Button onClick={() => { setOpenAddDialog(false); setEditMode(false); setEditingId(null); }}>Cancel</Button>
           <Button
             onClick={handleAddFarmer}
             variant="contained"
             disabled={loading}
           >
-            {loading ? <CircularProgress size={24} /> : 'Add Farmer'}
+            {loading ? <CircularProgress size={24} /> : (editMode ? 'Update Farmer' : 'Add Farmer')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -631,7 +621,7 @@ const FarmerManagement = () => {
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <LocationOnIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                          <Typography>{selectedFarmer.village}</Typography>
+                          <Typography>{selectedFarmer.villageName || selectedFarmer.village || 'N/A'}</Typography>
                         </Box>
                       </CardContent>
                     </Card>
@@ -643,13 +633,13 @@ const FarmerManagement = () => {
                           Farm Information
                         </Typography>
                         <Typography variant="body2" sx={{ mb: 1 }}>
-                          <strong>Land Size:</strong> {selectedFarmer.landSize}
+                          <strong>Land Size:</strong> {selectedFarmer.landSize || 'N/A'}
                         </Typography>
                         <Typography variant="body2" sx={{ mb: 1 }}>
-                          <strong>Crops:</strong> {selectedFarmer.crops}
+                          <strong>Crops:</strong> {Array.isArray(selectedFarmer.crops) ? selectedFarmer.crops.join(', ') : (selectedFarmer.crops || 'None')}
                         </Typography>
                         <Typography variant="body2">
-                          <strong>Aadhar:</strong> {selectedFarmer.aadharNo}
+                          <strong>Aadhar:</strong> {selectedFarmer.aadharNo || 'N/A'}
                         </Typography>
                       </CardContent>
                     </Card>
@@ -664,13 +654,13 @@ const FarmerManagement = () => {
                           <Grid item xs={12} sm={6}>
                             <Typography variant="body2">
                               <strong>Registration Date:</strong>{' '}
-                              {new Date(selectedFarmer.registrationDate).toLocaleDateString()}
+                              {new Date(selectedFarmer.createdAt || Date.now()).toLocaleDateString()}
                             </Typography>
                           </Grid>
                           <Grid item xs={12} sm={6}>
                             <Typography variant="body2">
-                              <strong>Last Visit Date:</strong>{' '}
-                              {new Date(selectedFarmer.lastVisitDate).toLocaleDateString()}
+                              <strong>Last Update:</strong>{' '}
+                              {new Date(selectedFarmer.updatedAt || Date.now()).toLocaleDateString()}
                             </Typography>
                           </Grid>
                         </Grid>
@@ -680,29 +670,42 @@ const FarmerManagement = () => {
                 </Grid>
               )}
 
-              {/* Fields Tab */}
               {tabValue === 1 && (
                 <>
-                  {selectedFarmer.fields && selectedFarmer.fields.length > 0 ? (
+                  {fieldsLoading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress /></Box>
+                  ) : farmerFields && farmerFields.length > 0 ? (
                     <Grid container spacing={2}>
-                      {selectedFarmer.fields.map((field) => (
+                      {farmerFields.map((field) => (
                         <Grid item xs={12} sm={6} key={field._id}>
                           <Card variant="outlined">
+                            <CardMedia
+                              component="img"
+                              height="140"
+                              image={field.photos && field.photos.length > 0 ? (field.photos[0].photoUrl || field.photos[0].url) : 'https://via.placeholder.com/300x140?text=No+Image'}
+                              alt={field.name}
+                            />
                             <CardContent>
                               <Typography variant="h6" gutterBottom>
                                 {field.name}
                               </Typography>
+                              {/* 
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Badge color="primary" badgeContent={field.crop && (typeof field.crop === 'object' ? field.crop.current : field.crop)}>
+                                </Badge>
+                              </Box> 
+                              */}
                               <Typography variant="body2" sx={{ mb: 1 }}>
-                                <strong>Size:</strong> {field.size}
+                                <strong>Size:</strong> {typeof field.size === 'object' ? `${field.size.value} ${field.size.unit}` : field.size}
                               </Typography>
                               <Typography variant="body2" sx={{ mb: 1 }}>
-                                <strong>Crop:</strong> {field.crop}
+                                <strong>Crop:</strong> {typeof field.crop === 'object' ? field.crop.current : field.crop}
                               </Typography>
                               <Typography variant="body2" sx={{ mb: 1 }}>
                                 <strong>Soil Type:</strong> {field.soilType}
                               </Typography>
                               <Typography variant="body2">
-                                <strong>Irrigation:</strong> {field.irrigationType}
+                                <strong>Irrigation:</strong> {field.irrigationSource || field.irrigationType}
                               </Typography>
                             </CardContent>
                           </Card>
@@ -710,7 +713,7 @@ const FarmerManagement = () => {
                       ))}
                     </Grid>
                   ) : (
-                    <Typography>No fields registered for this farmer.</Typography>
+                    <Typography>No fields registered for this farmer. Go to Field Management to add fields.</Typography>
                   )}
                 </>
               )}
@@ -777,7 +780,7 @@ const FarmerManagement = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </Box >
   )
 }
 

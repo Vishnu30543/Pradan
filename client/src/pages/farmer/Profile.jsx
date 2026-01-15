@@ -23,7 +23,6 @@ import {
   Select,
   MenuItem,
   Chip,
-  Stack,
   Tabs,
   Tab,
 } from '@mui/material'
@@ -38,11 +37,8 @@ import {
   Phone as PhoneIcon,
   Email as EmailIcon,
   Person as PersonIcon,
-  Home as HomeIcon,
   CalendarMonth as CalendarMonthIcon,
   Agriculture as AgricultureIcon,
-  Grass as GrassIcon,
-  // Eco as EcoIcon,
 } from '@mui/icons-material'
 import { useAuth } from '../../context/AuthContext'
 import axios from 'axios'
@@ -58,6 +54,8 @@ const Profile = () => {
   const [profileImagePreview, setProfileImagePreview] = useState(null)
   const [openPhotoDialog, setOpenPhotoDialog] = useState(false)
   const [fieldPhotos, setFieldPhotos] = useState([])
+  const [fields, setFields] = useState([])
+  const [derivedStats, setDerivedStats] = useState({ totalArea: 0, fieldCrops: [], allPhotos: [] })
   const [newFieldPhotos, setNewFieldPhotos] = useState([])
   const [newFieldPhotosPreviews, setNewFieldPhotosPreviews] = useState([])
   const [tabValue, setTabValue] = useState(0)
@@ -66,6 +64,7 @@ const Profile = () => {
     message: '',
     severity: 'success',
   })
+  const [selectedStatus, setSelectedStatus] = useState('green')
 
   useEffect(() => {
     fetchProfile()
@@ -74,9 +73,42 @@ const Profile = () => {
   const fetchProfile = async () => {
     try {
       setLoading(true)
-      const response = await axios.get('/api/farmer/profile')
-      setProfile(response.data.profile)
-      setEditedProfile(response.data.profile)
+
+      const [profileRes, fieldsRes] = await Promise.all([
+        axios.get('/api/farmer/profile'),
+        axios.get('/api/farmer/fields')
+      ])
+
+      const profileData = profileRes.data.farmer
+      const fieldsData = fieldsRes.data.fields || []
+
+      setProfile(profileData)
+
+      const flatProfile = { ...profileData }
+      if (typeof flatProfile.landSize === 'object') flatProfile.landSize = flatProfile.landSize?.value
+      setEditedProfile(flatProfile)
+      setFields(fieldsData)
+
+      // Calculate stats
+      const totalArea = fieldsData.reduce((sum, field) => {
+        const sizeVal = typeof field.size === 'object' ? field.size?.value : field.size;
+        return sum + (Number(sizeVal) || 0);
+      }, 0)
+      const uniqueCrops = [...new Set(fieldsData.map(f => {
+        if (!f.crop) return null;
+        if (typeof f.crop === 'string') return f.crop;
+        if (typeof f.crop === 'object') return f.crop.current || f.crop.name || JSON.stringify(f.crop); // Handle {current: ...} or other objects
+        return String(f.crop);
+      }).filter(Boolean))]
+
+      // Combine photos: Profile Photos + Field Photos
+      const profilePhotos = profileData.fieldPhotos || []
+      const fieldSpecificPhotos = fieldsData.flatMap(f => (f.photos || []).map(p => ({ ...p, fieldName: f.name })))
+      const allPhotos = [...profilePhotos, ...fieldSpecificPhotos]
+
+      setFieldPhotos(profilePhotos) // Keep for upload/delete of profile photos
+      setDerivedStats({ totalArea, fieldCrops: uniqueCrops, allPhotos })
+
       setError(null)
     } catch (err) {
       console.error('Error fetching profile:', err)
@@ -85,83 +117,6 @@ const Profile = () => {
       setLoading(false)
     }
   }
-
-  // For demo purposes, simulate API response with mock data
-  useEffect(() => {
-    const simulateApiResponse = () => {
-      setTimeout(() => {
-        const mockProfile = {
-          _id: '1',
-          name: 'Rajesh Kumar',
-          mobile: '9876543210',
-          email: 'rajesh.kumar@example.com',
-          address: {
-            village: 'Sundarpur',
-            district: 'Varanasi',
-            state: 'Uttar Pradesh',
-            pincode: '221005',
-          },
-          gender: 'male',
-          age: 45,
-          landDetails: {
-            totalArea: 5.5,
-            cultivableArea: 5,
-            soilType: 'black soil',
-            irrigationSource: 'tube well',
-          },
-          crops: [
-            { name: 'Wheat', area: 2.5, season: 'rabi' },
-            { name: 'Rice', area: 2, season: 'kharif' },
-            { name: 'Mustard', area: 0.5, season: 'rabi' },
-          ],
-          bankDetails: {
-            accountNumber: 'XXXX1234',
-            bankName: 'State Bank of India',
-            ifscCode: 'SBIN0001234',
-            accountHolderName: 'Rajesh Kumar',
-          },
-          registrationDate: '2022-05-15T10:30:00.000Z',
-          profileImage: 'https://randomuser.me/api/portraits/men/75.jpg',
-          fieldPhotos: [
-            {
-              _id: '1',
-              url: 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8',
-              caption: 'Wheat field - January 2023',
-              uploadDate: '2023-01-15T08:30:00.000Z',
-            },
-            {
-              _id: '2',
-              url: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef',
-              caption: 'Rice field - July 2022',
-              uploadDate: '2022-07-20T14:45:00.000Z',
-            },
-            {
-              _id: '3',
-              url: 'https://images.unsplash.com/photo-1464226184884-fa280b87c399',
-              caption: 'Mustard field - November 2022',
-              uploadDate: '2022-11-05T11:20:00.000Z',
-            },
-          ],
-          assignedExecutive: {
-            _id: '1',
-            name: 'John Doe',
-            email: 'john.doe@example.com',
-            phone: '9876543211',
-          },
-        }
-
-        setProfile(mockProfile)
-        setEditedProfile(mockProfile)
-        setFieldPhotos(mockProfile.fieldPhotos)
-        setLoading(false)
-      }, 1000)
-    }
-
-    // Use mock data for demo
-    simulateApiResponse()
-    // In production, use the actual API call
-    // fetchProfile()
-  }, [])
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue)
@@ -180,19 +135,7 @@ const Profile = () => {
 
   const handleProfileChange = (e) => {
     const { name, value } = e.target
-
-    if (name.includes('.')) {
-      const [parent, child] = name.split('.')
-      setEditedProfile({
-        ...editedProfile,
-        [parent]: {
-          ...editedProfile[parent],
-          [child]: value,
-        },
-      })
-    } else {
-      setEditedProfile({ ...editedProfile, [name]: value })
-    }
+    setEditedProfile({ ...editedProfile, [name]: value })
   }
 
   const handleProfileImageChange = (e) => {
@@ -201,6 +144,11 @@ const Profile = () => {
       setProfileImage(file)
       setProfileImagePreview(URL.createObjectURL(file))
     }
+  }
+
+  const handleOpenPhotoDialog = () => {
+    setSelectedStatus('green')
+    setOpenPhotoDialog(true)
   }
 
   const handleFieldPhotoChange = (e) => {
@@ -228,7 +176,6 @@ const Profile = () => {
     const updatedPhotos = [...newFieldPhotos]
     const updatedPreviews = [...newFieldPhotosPreviews]
 
-    // Revoke the object URL to avoid memory leaks
     URL.revokeObjectURL(updatedPreviews[index].url)
 
     updatedPhotos.splice(index, 1)
@@ -242,8 +189,11 @@ const Profile = () => {
     try {
       await axios.delete(`/api/farmer/field-photos/${photoId}`)
 
-      // Simulate API response for demo
-      setFieldPhotos(fieldPhotos.filter((photo) => photo._id !== photoId))
+      setFieldPhotos(prev => prev.filter((photo) => photo._id !== photoId))
+      setDerivedStats(prev => ({
+        ...prev,
+        allPhotos: prev.allPhotos.filter(p => p._id !== photoId)
+      }))
 
       setSnackbar({
         open: true,
@@ -264,13 +214,16 @@ const Profile = () => {
     try {
       setLoading(true)
 
-      // Create FormData for profile update with image
       const formData = new FormData()
 
-      // Append profile data as JSON
-      formData.append('profile', JSON.stringify(editedProfile))
+      Object.keys(editedProfile).forEach(key => {
+        if (typeof editedProfile[key] === 'object' && editedProfile[key] !== null) {
+          // Handle objects if needed
+        } else {
+          formData.append(key, editedProfile[key])
+        }
+      })
 
-      // Append profile image if changed
       if (profileImage) {
         formData.append('profileImage', profileImage)
       }
@@ -281,13 +234,11 @@ const Profile = () => {
         },
       })
 
-      // Simulate API response for demo
       setProfile({
-        ...editedProfile,
         profileImage: profileImagePreview || profile.profileImage,
+        ...editedProfile
       })
 
-      // Update user context if name changed
       if (editedProfile.name !== user.name) {
         updateUser({ ...user, name: editedProfile.name })
       }
@@ -316,10 +267,8 @@ const Profile = () => {
     try {
       setLoading(true)
 
-      // Create FormData for field photos
       const formData = new FormData()
 
-      // Append each photo and its caption
       newFieldPhotos.forEach((file, index) => {
         formData.append('photos', file)
         formData.append(
@@ -328,13 +277,16 @@ const Profile = () => {
         )
       })
 
+      if (selectedStatus) {
+        formData.append('healthStatus', selectedStatus)
+      }
+
       await axios.post('/api/farmer/field-photos', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       })
 
-      // Simulate API response for demo
       const newPhotos = newFieldPhotosPreviews.map((preview, index) => ({
         _id: `temp-${Date.now()}-${index}`,
         url: preview.url,
@@ -343,6 +295,11 @@ const Profile = () => {
       }))
 
       setFieldPhotos([...newPhotos, ...fieldPhotos])
+      setDerivedStats(prev => ({
+        ...prev,
+        allPhotos: [...newPhotos, ...prev.allPhotos]
+      }))
+
       setNewFieldPhotos([])
       setNewFieldPhotosPreviews([])
       setOpenPhotoDialog(false)
@@ -370,14 +327,7 @@ const Profile = () => {
 
   if (loading && !profile) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '80vh',
-        }}
-      >
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <CircularProgress />
       </Box>
     )
@@ -385,48 +335,52 @@ const Profile = () => {
 
   if (error) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '80vh',
-          flexDirection: 'column',
-        }}
-      >
-        <Typography variant="h6" color="error" gutterBottom>
-          {error}
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={fetchProfile}
-          sx={{ mt: 2 }}
-        >
-          Try Again
-        </Button>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh', flexDirection: 'column' }}>
+        <Typography variant="h6" color="error" gutterBottom>{error}</Typography>
+        <Button variant="contained" color="primary" onClick={fetchProfile} sx={{ mt: 2 }}>Try Again</Button>
       </Box>
     )
   }
 
   return (
-    <Box sx={{ flexGrow: 1 }}>
-      {/* Header */}
-      <Box
+    <Box sx={{ flexGrow: 1, pb: 4 }}>
+      {/* Header Banner */}
+      <Paper
         sx={{
+          p: 3,
+          mb: 3,
+          borderRadius: 2,
+          background: 'linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)',
+          color: 'white',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          mb: 3,
+          flexWrap: 'wrap',
+          gap: 2
         }}
+        elevation={3}
       >
-        <Typography variant="h4" component="h1" gutterBottom>
-          My Profile
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Avatar
+            src={profileImagePreview || profile.profileImage}
+            sx={{ width: 80, height: 80, border: '3px solid white', boxShadow: 3 }}
+          >
+            {profile.name ? profile.name.charAt(0).toUpperCase() : 'F'}
+          </Avatar>
+          <Box>
+            <Typography variant="h4" fontWeight="bold">
+              {profile.name}
+            </Typography>
+            <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+              {profile.villageName ? `${profile.villageName}, ` : ''}{profile.panchayatName || 'Farmer Profile'}
+            </Typography>
+          </Box>
+        </Box>
+
         {!editMode ? (
           <Button
             variant="contained"
-            color="primary"
+            sx={{ bgcolor: 'white', color: '#2E7D32', '&:hover': { bgcolor: '#f5f5f5' } }}
             startIcon={<EditIcon />}
             onClick={handleEditProfile}
           >
@@ -436,7 +390,7 @@ const Profile = () => {
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
               variant="outlined"
-              color="error"
+              sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: 'white', borderColor: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
               startIcon={<CancelIcon />}
               onClick={handleCancelEdit}
             >
@@ -444,347 +398,158 @@ const Profile = () => {
             </Button>
             <Button
               variant="contained"
-              color="primary"
+              sx={{ bgcolor: 'white', color: '#2E7D32', '&:hover': { bgcolor: '#f5f5f5' } }}
               startIcon={<SaveIcon />}
               onClick={handleSaveProfile}
               disabled={loading}
             >
-              {loading ? <CircularProgress size={24} /> : 'Save Changes'}
+              {loading ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
             </Button>
           </Box>
         )}
-      </Box>
+      </Paper>
 
-      {/* Tabs */}
+      {/* Navigation Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs
-          value={tabValue}
-          onChange={handleTabChange}
-          aria-label="profile tabs"
-          variant="scrollable"
-          scrollButtons="auto"
-        >
-          <Tab label="Personal Information" />
-          <Tab label="Farm Details" />
-          <Tab label="Field Photos" />
-          <Tab label="Bank Details" />
+        <Tabs value={tabValue} onChange={handleTabChange} aria-label="profile tabs" textColor="primary" indicatorColor="primary">
+          <Tab label="Personal Information" icon={<PersonIcon />} iconPosition="start" />
+          <Tab label="Farm Details" icon={<AgricultureIcon />} iconPosition="start" />
+          <Tab label="Field Photos" icon={<PhotoCameraIcon />} iconPosition="start" />
         </Tabs>
       </Box>
 
-      {/* Personal Information Tab */}
+      {/* Tab Panel: Personal Information */}
       {tabValue === 0 && (
         <Grid container spacing={3}>
-          {/* Profile Card */}
+          {/* Summary Card */}
           <Grid item xs={12} md={4}>
-            <Card sx={{ height: '100%' }}>
-              <CardContent
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  textAlign: 'center',
-                }}
-              >
-                <Box sx={{ position: 'relative' }}>
-                  <Avatar
-                    src={
-                      profileImagePreview ||
-                      profile.profileImage ||
-                      '/static/images/avatar/farmer.png'
-                    }
-                    alt={profile.name}
-                    sx={{ width: 150, height: 150, mb: 2 }}
-                  />
-                  {editMode && (
-                    <IconButton
-                      color="primary"
-                      aria-label="upload picture"
-                      component="label"
-                      sx={{
-                        position: 'absolute',
-                        bottom: 10,
-                        right: 0,
-                        bgcolor: 'background.paper',
-                      }}
-                    >
-                      <input
-                        hidden
-                        accept="image/*"
-                        type="file"
-                        onChange={handleProfileImageChange}
-                      />
-                      <PhotoCameraIcon />
-                    </IconButton>
-                  )}
-                </Box>
-
-                <Typography variant="h5" gutterBottom>
-                  {profile.name}
-                </Typography>
-
-                <Chip
-                  icon={<PhoneIcon />}
-                  label={profile.mobile}
-                  sx={{ mb: 1 }}
-                />
-
-                {profile.email && (
-                  <Chip
-                    icon={<EmailIcon />}
-                    label={profile.email}
-                    sx={{ mb: 1 }}
-                  />
-                )}
-
-                <Divider sx={{ width: '100%', my: 2 }} />
-
-                <Box sx={{ textAlign: 'left', width: '100%' }}>
-                  <Typography variant="body2" sx={{ mb: 1 }}>
-                    <LocationOnIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: 'middle', mr: 1 }}
-                    />
-                    {`${profile.address.village}, ${profile.address.district}, ${profile.address.state} - ${profile.address.pincode}`}
-                  </Typography>
-
-                  <Typography variant="body2" sx={{ mb: 1 }}>
-                    <PersonIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: 'middle', mr: 1 }}
-                    />
-                    {profile.gender === 'male' ? 'Male' : 'Female'}, {profile.age} years
-                  </Typography>
-
-                  <Typography variant="body2">
-                    <CalendarMonthIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: 'middle', mr: 1 }}
-                    />
-                    Registered on{' '}
-                    {new Date(profile.registrationDate).toLocaleDateString()}
-                  </Typography>
+            <Card sx={{ height: '100%', boxShadow: 2 }}>
+              <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>FARMER ID: {profile._id?.slice(-6).toUpperCase()}</Typography>
+                <Divider sx={{ my: 2 }} />
+                <Box sx={{ textAlign: 'left', px: 2 }}>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="caption" color="text.secondary">Contact</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                      <PhoneIcon fontSize="small" color="action" sx={{ mr: 1 }} />
+                      <Typography variant="body1">{profile.mobileNo}</Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="caption" color="text.secondary">Category</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                      <PersonIcon fontSize="small" color="action" sx={{ mr: 1 }} />
+                      <Typography variant="body1">{profile.isWomenFarmer === 'yes' ? 'Women Farmer' : 'General'}</Typography>
+                    </Box>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Registered Since</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                      <CalendarMonthIcon fontSize="small" color="action" sx={{ mr: 1 }} />
+                      <Typography variant="body1">{new Date(profile.createdAt || Date.now()).toLocaleDateString()}</Typography>
+                    </Box>
+                  </Box>
                 </Box>
               </CardContent>
             </Card>
           </Grid>
 
-          {/* Personal Details */}
+          {/* Details Form/View */}
           <Grid item xs={12} md={8}>
-            <Paper sx={{ p: 3, height: '100%' }}>
-              <Typography variant="h6" gutterBottom>
-                Personal Details
-              </Typography>
-              <Divider sx={{ mb: 3 }} />
-
-              <Grid container spacing={2}>
+            <Paper sx={{ p: 4, boxShadow: 2 }}>
+              <Typography variant="h6" gutterBottom color="primary">Personal Details</Typography>
+              <Grid container spacing={3}>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Full Name"
-                    name="name"
-                    value={editMode ? editedProfile.name : profile.name}
-                    onChange={handleProfileChange}
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                    InputProps={{
-                      readOnly: !editMode,
-                    }}
-                  />
+                  {editMode ? (
+                    <TextField fullWidth label="Full Name" name="name" value={editedProfile.name || ''} onChange={handleProfileChange} variant="outlined" />
+                  ) : (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Full Name</Typography>
+                      <Typography variant="body1" fontWeight="500">{profile.name}</Typography>
+                    </Box>
+                  )}
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Mobile Number"
-                    name="mobile"
-                    value={editMode ? editedProfile.mobile : profile.mobile}
-                    onChange={handleProfileChange}
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                    InputProps={{
-                      readOnly: !editMode,
-                    }}
-                  />
+                  {editMode ? (
+                    <TextField fullWidth label="Father/Husband Name" name="fatherOrHusbandName" value={editedProfile.fatherOrHusbandName || ''} onChange={handleProfileChange} variant="outlined" />
+                  ) : (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Father/Husband Name</Typography>
+                      <Typography variant="body1" fontWeight="500">{profile.fatherOrHusbandName || '-'}</Typography>
+                    </Box>
+                  )}
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Email"
-                    name="email"
-                    type="email"
-                    value={
-                      editMode
-                        ? editedProfile.email || ''
-                        : profile.email || ''
-                    }
-                    onChange={handleProfileChange}
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                    InputProps={{
-                      readOnly: !editMode,
-                    }}
-                  />
+                  {editMode ? (
+                    <TextField fullWidth label="Email" name="email" value={editedProfile.email || ''} onChange={handleProfileChange} variant="outlined" />
+                  ) : (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Email</Typography>
+                      <Typography variant="body1" fontWeight="500">{profile.email || '-'}</Typography>
+                    </Box>
+                  )}
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <FormControl
-                    fullWidth
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                  >
-                    <InputLabel id="gender-label">Gender</InputLabel>
-                    <Select
-                      labelId="gender-label"
-                      name="gender"
-                      value={editMode ? editedProfile.gender : profile.gender}
-                      onChange={handleProfileChange}
-                      label="Gender"
-                      inputProps={{
-                        readOnly: !editMode,
-                      }}
-                    >
-                      <MenuItem value="male">Male</MenuItem>
-                      <MenuItem value="female">Female</MenuItem>
-                      <MenuItem value="other">Other</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Age"
-                    name="age"
-                    type="number"
-                    value={editMode ? editedProfile.age : profile.age}
-                    onChange={handleProfileChange}
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                    InputProps={{
-                      readOnly: !editMode,
-                    }}
-                  />
+                  {editMode ? (
+                    <FormControl fullWidth variant="outlined">
+                      <InputLabel>Is Women Farmer</InputLabel>
+                      <Select label="Is Women Farmer" name="isWomenFarmer" value={editedProfile.isWomenFarmer || 'no'} onChange={handleProfileChange}>
+                        <MenuItem value="no">No</MenuItem>
+                        <MenuItem value="yes">Yes</MenuItem>
+                      </Select>
+                    </FormControl>
+                  ) : (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Gender Category</Typography>
+                      <Typography variant="body1" fontWeight="500">{profile.isWomenFarmer === 'yes' ? 'Women Farmer' : 'General'}</Typography>
+                    </Box>
+                  )}
                 </Grid>
               </Grid>
 
-              <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-                Address
-              </Typography>
-              <Divider sx={{ mb: 3 }} />
+              <Divider sx={{ my: 4 }} />
 
-              <Grid container spacing={2}>
+              <Typography variant="h6" gutterBottom color="primary">Location & Social</Typography>
+              <Grid container spacing={3}>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Village"
-                    name="address.village"
-                    value={
-                      editMode
-                        ? editedProfile.address.village
-                        : profile.address.village
-                    }
-                    onChange={handleProfileChange}
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                    InputProps={{
-                      readOnly: !editMode,
-                    }}
-                  />
+                  {editMode ? (
+                    <TextField fullWidth label="Village" name="villageName" value={editedProfile.villageName || ''} onChange={handleProfileChange} variant="outlined" />
+                  ) : (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Village</Typography>
+                      <Typography variant="body1" fontWeight="500">{profile.villageName || '-'}</Typography>
+                    </Box>
+                  )}
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="District"
-                    name="address.district"
-                    value={
-                      editMode
-                        ? editedProfile.address.district
-                        : profile.address.district
-                    }
-                    onChange={handleProfileChange}
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                    InputProps={{
-                      readOnly: !editMode,
-                    }}
-                  />
+                  {editMode ? (
+                    <TextField fullWidth label="Panchayat" name="panchayatName" value={editedProfile.panchayatName || ''} onChange={handleProfileChange} variant="outlined" />
+                  ) : (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Panchayat</Typography>
+                      <Typography variant="body1" fontWeight="500">{profile.panchayatName || '-'}</Typography>
+                    </Box>
+                  )}
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="State"
-                    name="address.state"
-                    value={
-                      editMode
-                        ? editedProfile.address.state
-                        : profile.address.state
-                    }
-                    onChange={handleProfileChange}
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                    InputProps={{
-                      readOnly: !editMode,
-                    }}
-                  />
+                  {editMode ? (
+                    <TextField fullWidth label="Caste" name="caste" value={editedProfile.caste || ''} onChange={handleProfileChange} variant="outlined" />
+                  ) : (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Caste</Typography>
+                      <Typography variant="body1" fontWeight="500">{profile.caste || '-'}</Typography>
+                    </Box>
+                  )}
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="PIN Code"
-                    name="address.pincode"
-                    value={
-                      editMode
-                        ? editedProfile.address.pincode
-                        : profile.address.pincode
-                    }
-                    onChange={handleProfileChange}
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                    InputProps={{
-                      readOnly: !editMode,
-                    }}
-                  />
-                </Grid>
-              </Grid>
-
-              <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-                Executive Details
-              </Typography>
-              <Divider sx={{ mb: 3 }} />
-
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Executive Name"
-                    value={profile.assignedExecutive?.name || 'Not Assigned'}
-                    disabled
-                    variant="filled"
-                    InputProps={{
-                      readOnly: true,
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Executive Contact"
-                    value={profile.assignedExecutive?.phone || 'N/A'}
-                    disabled
-                    variant="filled"
-                    InputProps={{
-                      readOnly: true,
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Executive Email"
-                    value={profile.assignedExecutive?.email || 'N/A'}
-                    disabled
-                    variant="filled"
-                    InputProps={{
-                      readOnly: true,
-                    }}
-                  />
+                  {editMode ? (
+                    <TextField fullWidth label="Group Name" name="groupName" value={editedProfile.groupName || ''} onChange={handleProfileChange} variant="outlined" />
+                  ) : (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Group Name</Typography>
+                      <Typography variant="body1" fontWeight="500">{profile.groupName || '-'}</Typography>
+                    </Box>
+                  )}
                 </Grid>
               </Grid>
             </Paper>
@@ -792,430 +557,183 @@ const Profile = () => {
         </Grid>
       )}
 
-      {/* Farm Details Tab */}
+      {/* Tab Panel: Farm Details */}
       {tabValue === 1 && (
-        <Grid container spacing={3}>
-          {/* Land Details */}
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Land Details
-              </Typography>
-              <Divider sx={{ mb: 3 }} />
-
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Total Land Area (Acres)"
-                    name="landDetails.totalArea"
-                    type="number"
-                    value={
-                      editMode
-                        ? editedProfile.landDetails.totalArea
-                        : profile.landDetails.totalArea
-                    }
-                    onChange={handleProfileChange}
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                    InputProps={{
-                      readOnly: !editMode,
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Cultivable Area (Acres)"
-                    name="landDetails.cultivableArea"
-                    type="number"
-                    value={
-                      editMode
-                        ? editedProfile.landDetails.cultivableArea
-                        : profile.landDetails.cultivableArea
-                    }
-                    onChange={handleProfileChange}
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                    InputProps={{
-                      readOnly: !editMode,
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Soil Type"
-                    name="landDetails.soilType"
-                    value={
-                      editMode
-                        ? editedProfile.landDetails.soilType
-                        : profile.landDetails.soilType
-                    }
-                    onChange={handleProfileChange}
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                    InputProps={{
-                      readOnly: !editMode,
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Irrigation Source"
-                    name="landDetails.irrigationSource"
-                    value={
-                      editMode
-                        ? editedProfile.landDetails.irrigationSource
-                        : profile.landDetails.irrigationSource
-                    }
-                    onChange={handleProfileChange}
-                    disabled={!editMode}
-                    variant={editMode ? 'outlined' : 'filled'}
-                    InputProps={{
-                      readOnly: !editMode,
-                    }}
-                  />
-                </Grid>
-              </Grid>
-
-              <Box
-                sx={{
-                  mt: 3,
-                  p: 2,
-                  bgcolor: 'background.paper',
-                  borderRadius: 1,
-                  border: '1px dashed',
-                  borderColor: 'divider',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <AgricultureIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="subtitle1">Land Usage Summary</Typography>
-                </Box>
-                <Typography variant="body2" gutterBottom>
-                  <strong>Total Area:</strong> {profile.landDetails.totalArea} acres
-                </Typography>
-                <Typography variant="body2" gutterBottom>
-                  <strong>Cultivable Area:</strong>{' '}
-                  {profile.landDetails.cultivableArea} acres ({
-                    Math.round(
-                      (profile.landDetails.cultivableArea /
-                        profile.landDetails.totalArea) *
-                        100
-                    )
-                  }%)
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Uncultivable Area:</strong>{' '}
-                  {profile.landDetails.totalArea -
-                    profile.landDetails.cultivableArea}{' '}
-                  acres
-                </Typography>
-              </Box>
-            </Paper>
-          </Grid>
-
-          {/* Crop Details */}
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Crop Details
-              </Typography>
-              <Divider sx={{ mb: 3 }} />
-
-              {profile.crops.map((crop, index) => (
-                <Box
-                  key={index}
-                  sx={{
-                    mb: 2,
-                    p: 2,
-                    bgcolor: 'background.paper',
-                    borderRadius: 1,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                    <GrassIcon
-                      color={
-                        crop.season === 'kharif'
-                          ? 'success'
-                          : crop.season === 'rabi'
-                          ? 'warning'
-                          : 'info'
-                      }
-                      sx={{ mr: 1 }}
-                    />
-                    <Typography variant="subtitle1">{crop.name}</Typography>
-                    <Chip
-                      label={crop.season.toUpperCase()}
-                      size="small"
-                      sx={{ ml: 'auto' }}
-                      color={
-                        crop.season === 'kharif'
-                          ? 'success'
-                          : crop.season === 'rabi'
-                          ? 'warning'
-                          : 'info'
-                      }
-                    />
-                  </Box>
-                  <Typography variant="body2">
-                    <strong>Area:</strong> {crop.area} acres ({
-                      Math.round(
-                        (crop.area / profile.landDetails.cultivableArea) * 100
-                      )
-                    }% of
-                    cultivable land)
+        <Box>
+          <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ bgcolor: 'success.light', color: 'white' }}>
+                <CardContent>
+                  <Typography variant="overline" sx={{ opacity: 0.8 }}>Registered Land</Typography>
+                  <Typography variant="h4" fontWeight="bold">
+                    {derivedStats.totalArea} <Typography component="span" variant="subtitle1">Acres</Typography>
                   </Typography>
-                </Box>
-              ))}
-
-              <Box
-                sx={{
-                  mt: 3,
-                  p: 2,
-                  bgcolor: 'background.paper',
-                  borderRadius: 1,
-                  border: '1px dashed',
-                  borderColor: 'divider',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  {/* <EcoIcon color="success" sx={{ mr: 1 }} /> */}
-                  <Typography variant="subtitle1">Crop Distribution</Typography>
-                </Box>
-                {profile.crops.map((crop, index) => (
-                  <Box key={index} sx={{ mb: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Typography variant="body2" sx={{ flexGrow: 1 }}>
-                        {crop.name}
-                      </Typography>
-                      <Typography variant="body2">
-                        {Math.round(
-                          (crop.area / profile.landDetails.cultivableArea) * 100
-                        )}%
-                      </Typography>
-                    </Box>
-                    <Box
-                      sx={{
-                        height: 8,
-                        bgcolor: 'grey.200',
-                        borderRadius: 5,
-                        mt: 0.5,
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          height: '100%',
-                          width: `${Math.round(
-                            (crop.area / profile.landDetails.cultivableArea) * 100
-                          )}%`,
-                          bgcolor:
-                            crop.season === 'kharif'
-                              ? 'success.main'
-                              : crop.season === 'rabi'
-                              ? 'warning.main'
-                              : 'info.main',
-                          borderRadius: 5,
-                        }}
-                      />
-                    </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card>
+                <CardContent>
+                  <Typography variant="overline" color="text.secondary">Active Crops</Typography>
+                  <Box sx={{ mt: 1 }}>
+                    {derivedStats.fieldCrops.length > 0 ? (
+                      derivedStats.fieldCrops.map(c => <Chip key={c} label={c} size="small" sx={{ mr: 0.5, mb: 0.5 }} />)
+                    ) : <Typography variant="h6">-</Typography>}
                   </Box>
-                ))}
-              </Box>
-            </Paper>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card>
+                <CardContent>
+                  <Typography variant="overline" color="text.secondary">Income (Est.)</Typography>
+                  <Typography variant="h5" fontWeight="bold">₹ {(typeof profile.estimatedIncome === 'object' ? profile.estimatedIncome.current : profile.estimatedIncome)?.toLocaleString() || 0}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card>
+                <CardContent>
+                  <Typography variant="overline" color="text.secondary">Actual Income</Typography>
+                  <Typography variant="h5" fontWeight="bold" color="success.main">₹ {(typeof profile.income === 'object' ? profile.income.current : profile.income)?.toLocaleString() || 0}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
-        </Grid>
+
+          <Grid container spacing={3}>
+            {/* Fields List */}
+            <Grid item xs={12} md={8}>
+              <Paper sx={{ p: 3, mb: 3 }}>
+                <Typography variant="h6" gutterBottom>Registered Fields</Typography>
+                {fields.length > 0 ? (
+                  <Grid container spacing={2}>
+                    {fields.map(field => (
+                      <Grid item xs={12} sm={6} key={field._id}>
+                        <Card variant="outlined" sx={{ p: 2 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="subtitle1" fontWeight="bold">{field.name}</Typography>
+                            <Chip label={(typeof field.crop === 'object' ? field.crop.current : field.crop) || 'Fallow'} color={field.crop ? 'success' : 'default'} size="small" />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            Size: {typeof field.size === 'object' ? field.size?.value : field.size} Acres
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Location: {field.location?.village || '-'}
+                          </Typography>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                ) : (
+                  <Typography color="text.secondary">No fields registered yet.</Typography>
+                )}
+              </Paper>
+
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>Additional Farm Info</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    {editMode ? (
+                      <TextField fullWidth label="Calculated Land Size (Acres)" name="landSize" value={editedProfile.landSize || ''} onChange={handleProfileChange} />
+                    ) : (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">Manual Land Record</Typography>
+                        <Typography variant="body1">
+                          {(typeof profile.landSize === 'object' ? `${profile.landSize.value} ${profile.landSize.unit || ''}` : profile.landSize) || '-'}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Grid>
+                  <Grid item xs={12} sm={12}>
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="caption" color="text.secondary" display="block" gutterBottom>Manual Crop/Plant Data</Typography>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {(profile.plants || []).map((p, i) => <Chip key={i} label={p} variant="outlined" />)}
+                        {Array.isArray(profile.crops || profile.cropData) && (profile.crops || profile.cropData).map((c, i) => (
+                          <Chip key={`c-${i}`} label={typeof c === 'string' ? c : (c.name || JSON.stringify(c))} color="info" variant="outlined" />
+                        ))}
+                      </Box>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <Card sx={{ bgcolor: 'primary.dark', color: 'white' }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>Support Executive</Typography>
+                  {profile.assignedExecutive ? (
+                    <Box>
+                      <Typography variant="subtitle1">{profile.assignedExecutive.name}</Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.8 }}>{profile.assignedExecutive.email}</Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.8 }}>{profile.assignedExecutive.phone}</Typography>
+                      <Button variant="outlined" color="inherit" size="small" sx={{ mt: 2 }} startIcon={<PhoneIcon />}>Call</Button>
+                    </Box>
+                  ) : (
+                    <Typography>No executive assigned.</Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Box>
       )}
 
-      {/* Field Photos Tab */}
+      {/* Tab Panel: Field Photos */}
       {tabValue === 2 && (
         <Box>
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              mb: 3,
-            }}
-          >
-            <Typography variant="h6">Field Photos</Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<CloudUploadIcon />}
-              onClick={() => setOpenPhotoDialog(true)}
-            >
-              Upload Photos
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h6">Photo Gallery ({derivedStats.allPhotos.length})</Typography>
+            <Button variant="contained" startIcon={<CloudUploadIcon />} onClick={handleOpenPhotoDialog}>
+              Upload Photo
             </Button>
           </Box>
 
-          {fieldPhotos.length > 0 ? (
+          {derivedStats.allPhotos.length > 0 ? (
             <Grid container spacing={3}>
-              {fieldPhotos.map((photo, index) => (
-                <Grid item xs={12} sm={6} md={4} key={photo._id}>
-                  <Card>
+              {derivedStats.allPhotos.map((photo, index) => (
+                <Grid item xs={12} sm={6} md={4} key={photo._id || index}>
+                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                     <Box
                       sx={{
+                        pt: '75%',
                         position: 'relative',
-                        paddingTop: '75%', // 4:3 aspect ratio
-                        backgroundImage: `url(${photo.url})`,
+                        backgroundImage: `url(${photo.url || photo.photoUrl})`,
                         backgroundSize: 'cover',
-                        backgroundPosition: 'center',
+                        backgroundPosition: 'center'
                       }}
                     >
-                      <IconButton
-                        sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          bgcolor: 'rgba(0, 0, 0, 0.5)',
-                          '&:hover': {
-                            bgcolor: 'rgba(0, 0, 0, 0.7)',
-                          },
-                        }}
-                        onClick={() => handleDeleteFieldPhoto(photo._id)}
-                      >
-                        <DeleteIcon sx={{ color: 'white' }} />
-                      </IconButton>
+                      {!photo.fieldName && (
+                        <IconButton
+                          sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'rgba(0,0,0,0.6)', color: 'white', '&:hover': { bgcolor: 'red' } }}
+                          onClick={() => handleDeleteFieldPhoto(photo._id)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      )}
                     </Box>
-                    <CardContent>
-                      <Typography variant="subtitle1" gutterBottom>
-                        {photo.caption}
-                      </Typography>
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Typography variant="body2" fontWeight="bold">{photo.caption || photo.fieldName || 'No Description'}</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Uploaded on {new Date(photo.uploadDate).toLocaleDateString()}
+                        {new Date(photo.createdAt || photo.uploadDate || photo.uploadedAt || Date.now()).toLocaleDateString()}
                       </Typography>
+                      {photo.fieldName && <Chip size="small" label={photo.fieldName} sx={{ mt: 1, display: 'block', width: 'fit-content' }} />}
                     </CardContent>
                   </Card>
                 </Grid>
               ))}
             </Grid>
           ) : (
-            <Paper
-              sx={{
-                p: 3,
-                textAlign: 'center',
-                bgcolor: 'background.paper',
-              }}
-            >
-              <Typography variant="body1" color="text.secondary">
-                No field photos uploaded yet. Click the button above to upload
-                photos of your farm.
-              </Typography>
+            <Paper sx={{ p: 5, textAlign: 'center', color: 'text.secondary' }}>
+              <PhotoCameraIcon sx={{ fontSize: 60, mb: 2, opacity: 0.2 }} />
+              <Typography>No photos found. Upload photos or register fields with photos.</Typography>
             </Paper>
           )}
         </Box>
       )}
 
-      {/* Bank Details Tab */}
-      {tabValue === 3 && (
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Bank Account Details
-          </Typography>
-          <Divider sx={{ mb: 3 }} />
-
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Account Holder Name"
-                name="bankDetails.accountHolderName"
-                value={
-                  editMode
-                    ? editedProfile.bankDetails.accountHolderName
-                    : profile.bankDetails.accountHolderName
-                }
-                onChange={handleProfileChange}
-                disabled={!editMode}
-                variant={editMode ? 'outlined' : 'filled'}
-                InputProps={{
-                  readOnly: !editMode,
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Bank Name"
-                name="bankDetails.bankName"
-                value={
-                  editMode
-                    ? editedProfile.bankDetails.bankName
-                    : profile.bankDetails.bankName
-                }
-                onChange={handleProfileChange}
-                disabled={!editMode}
-                variant={editMode ? 'outlined' : 'filled'}
-                InputProps={{
-                  readOnly: !editMode,
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Account Number"
-                name="bankDetails.accountNumber"
-                value={
-                  editMode
-                    ? editedProfile.bankDetails.accountNumber
-                    : profile.bankDetails.accountNumber
-                }
-                onChange={handleProfileChange}
-                disabled={!editMode}
-                variant={editMode ? 'outlined' : 'filled'}
-                InputProps={{
-                  readOnly: !editMode,
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="IFSC Code"
-                name="bankDetails.ifscCode"
-                value={
-                  editMode
-                    ? editedProfile.bankDetails.ifscCode
-                    : profile.bankDetails.ifscCode
-                }
-                onChange={handleProfileChange}
-                disabled={!editMode}
-                variant={editMode ? 'outlined' : 'filled'}
-                InputProps={{
-                  readOnly: !editMode,
-                }}
-              />
-            </Grid>
-          </Grid>
-
-          <Box
-            sx={{
-              mt: 3,
-              p: 2,
-              bgcolor: 'background.paper',
-              borderRadius: 1,
-              border: '1px dashed',
-              borderColor: 'divider',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <HomeIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="subtitle1">Bank Account Information</Typography>
-            </Box>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              This bank account is used for all financial transactions, including
-              payments for your produce, subsidies, and carbon credit benefits.
-              Please ensure the details are accurate.
-            </Typography>
-          </Box>
-        </Paper>
-      )}
 
       {/* Upload Field Photos Dialog */}
       <Dialog
@@ -1227,9 +745,21 @@ const Profile = () => {
         <DialogTitle>Upload Field Photos</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" paragraph>
-            Upload photos of your fields to help executives monitor crop health
-            and provide better assistance.
+            Upload generic photos or photos of your fields.
           </Typography>
+
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <InputLabel>Field Health Status</InputLabel>
+            <Select
+              value={selectedStatus}
+              label="Field Health Status"
+              onChange={(e) => setSelectedStatus(e.target.value)}
+            >
+              <MenuItem value="green">Healthy (Green)</MenuItem>
+              <MenuItem value="yellow">Needs Attention (Yellow)</MenuItem>
+              <MenuItem value="red">Critical (Red)</MenuItem>
+            </Select>
+          </FormControl>
 
           <Button
             variant="outlined"
@@ -1252,42 +782,10 @@ const Profile = () => {
               {newFieldPhotosPreviews.map((preview, index) => (
                 <Grid item xs={12} sm={6} md={4} key={index}>
                   <Card>
-                    <Box
-                      sx={{
-                        position: 'relative',
-                        paddingTop: '75%', // 4:3 aspect ratio
-                        backgroundImage: `url(${preview.url})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                      }}
-                    >
-                      <IconButton
-                        sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          bgcolor: 'rgba(0, 0, 0, 0.5)',
-                          '&:hover': {
-                            bgcolor: 'rgba(0, 0, 0, 0.7)',
-                          },
-                        }}
-                        onClick={() => handleRemoveNewPhoto(index)}
-                      >
-                        <DeleteIcon sx={{ color: 'white' }} />
-                      </IconButton>
-                    </Box>
                     <CardContent>
-                      <TextField
-                        fullWidth
-                        label="Caption"
-                        placeholder="Describe this field photo"
-                        value={preview.caption}
-                        onChange={(e) =>
-                          handleCaptionChange(index, e.target.value)
-                        }
-                        variant="outlined"
-                        size="small"
-                      />
+                      <Box component="img" src={preview.url} sx={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 1 }} />
+                      <TextField size="small" fullWidth placeholder="Caption" value={preview.caption} onChange={(e) => handleCaptionChange(index, e.target.value)} sx={{ mt: 1 }} />
+                      <Button size="small" color="error" fullWidth onClick={() => handleRemoveNewPhoto(index)}>Remove</Button>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -1308,7 +806,6 @@ const Profile = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}

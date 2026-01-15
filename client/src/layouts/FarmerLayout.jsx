@@ -34,6 +34,7 @@ import {
   AccountCircle as AccountCircleIcon,
 } from '@mui/icons-material'
 import AuthContext from '../context/AuthContext'
+import VoiceAssistant from '../components/common/VoiceAssistant'
 
 const drawerWidth = 240
 
@@ -205,16 +206,16 @@ const FarmerLayout = () => {
             }),
             ...(!open &&
               !isMobile && {
-                overflowX: 'hidden',
-                transition: theme.transitions.create('width', {
-                  easing: theme.transitions.easing.sharp,
-                  duration: theme.transitions.duration.leavingScreen,
-                }),
-                width: theme.spacing(7),
-                [theme.breakpoints.up('sm')]: {
-                  width: theme.spacing(9),
-                },
+              overflowX: 'hidden',
+              transition: theme.transitions.create('width', {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.leavingScreen,
               }),
+              width: theme.spacing(7),
+              [theme.breakpoints.up('sm')]: {
+                width: theme.spacing(9),
+              },
+            }),
           },
         }}
       >
@@ -266,8 +267,7 @@ const FarmerLayout = () => {
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { sm: `calc(100% - ${open ? drawerWidth : 0}px)` },
-          ml: { sm: `${open ? drawerWidth : 0}px` },
+          width: '100%',
           transition: theme.transitions.create(['width', 'margin'], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,
@@ -277,6 +277,7 @@ const FarmerLayout = () => {
         <Toolbar /> {/* This is for spacing below the AppBar */}
         <Outlet />
       </Box>
+      <VoiceAssistant />
     </Box>
   )
 }

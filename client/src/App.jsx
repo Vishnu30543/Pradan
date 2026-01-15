@@ -17,6 +17,7 @@ import Login from './pages/auth/Login'
 import AdminDashboard from './pages/admin/Dashboard'
 import ExecutiveManagement from './pages/admin/ExecutiveManagement'
 import FarmerOverview from './pages/admin/FarmerOverview'
+import SchemeManagement from './pages/admin/SchemeManagement'
 import AdminAnalytics from './pages/admin/Analytics'
 import AdminReports from './pages/admin/Reports'
 
@@ -25,7 +26,7 @@ import ExecutiveDashboard from './pages/executive/Dashboard'
 import FarmerManagement from './pages/executive/FarmerManagement'
 import RequestManagement from './pages/executive/RequestManagement'
 import FieldManagement from './pages/executive/FieldManagement'
-import CarbonCredits from './pages/executive/CarbonCredits'
+
 import IncomeAnalysis from './pages/executive/IncomeAnalysis'
 import GovernmentSchemes from './pages/executive/GovernmentSchemes'
 import SMSBroadcast from './pages/executive/SMSBroadcast'
@@ -88,6 +89,7 @@ function App() {
           <Route index element={<AdminDashboard />} />
           <Route path="executives" element={<ExecutiveManagement />} />
           <Route path="farmers" element={<FarmerOverview />} />
+          <Route path="schemes" element={<SchemeManagement />} />
           <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="reports" element={<AdminReports />} />
         </Route>
@@ -105,7 +107,7 @@ function App() {
           <Route path="farmers" element={<FarmerManagement />} />
           <Route path="requests" element={<RequestManagement />} />
           <Route path="fields" element={<FieldManagement />} />
-          <Route path="carbon-credits" element={<CarbonCredits />} />
+
           <Route path="income-analysis" element={<IncomeAnalysis />} />
           <Route path="schemes" element={<GovernmentSchemes />} />
           <Route path="sms" element={<SMSBroadcast />} />

@@ -128,10 +128,10 @@ exports.registerExecutive = async (req, res) => {
  */
 exports.login = async (req, res) => {
   try {
-    const { username, email, password, role } = req.body;
+    const { username, email, mobileNo, password, role } = req.body;
 
     // Validate input
-    if ((!username && !email) || !password || !role) {
+    if ((!username && !email && !mobileNo) || !password || !role) {
       return res.status(400).json({
         success: false,
         message: 'Please provide login credentials and role'
@@ -151,8 +151,8 @@ exports.login = async (req, res) => {
         });
       }
 
-      // Check if admin exists
-      user = await Admin.findOne({ adminname: username });
+      // Check if admin exists - include password for authentication
+      user = await Admin.findOne({ adminname: username }).select('+password');
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -185,8 +185,8 @@ exports.login = async (req, res) => {
         });
       }
 
-      // Check if executive exists
-      user = await Executive.findOne({ email });
+      // Check if executive exists - include password for authentication
+      user = await Executive.findOne({ email }).select('+password');
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -212,15 +212,23 @@ exports.login = async (req, res) => {
         role: 'executive'
       };
     } else if (role === 'farmer') {
-      if (!email) {
+      // Farmer can login with either email or mobileNo
+      if (!email && !mobileNo) {
         return res.status(400).json({
           success: false,
-          message: 'Please provide email'
+          message: 'Please provide email or mobile number'
         });
       }
 
-      // Check if farmer exists
-      user = await Farmer.findOne({ email });
+      // Check if farmer exists - include password for authentication
+      // Try to find by email first, then by mobileNo
+      if (email) {
+        user = await Farmer.findOne({ email }).select('+password');
+      }
+      if (!user && mobileNo) {
+        user = await Farmer.findOne({ mobileNo }).select('+password');
+      }
+
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -243,6 +251,7 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        mobileNo: user.mobileNo,
         role: 'farmer'
       };
     } else {

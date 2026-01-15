@@ -24,12 +24,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // File upload middleware
-app.use(fileUpload({
-  useTempFiles: true,
-  tempFileDir: '/tmp/',
-  createParentPath: true,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max file size
-}));
+// File upload middleware - DISABLED globally to allow Multer usage on specific routes
+// app.use(fileUpload({
+//   useTempFiles: true,
+//   tempFileDir: '/tmp/',
+//   createParentPath: true,
+//   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max file size
+// }));
 
 // Dev logging middleware
 if (process.env.NODE_ENV === 'development') {
@@ -44,8 +45,8 @@ mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('MongoDB connected successfully'))
-.catch(err => console.error('MongoDB connection error:', err));
+  .then(() => console.log('MongoDB connected successfully'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // Import routes
 const routes = require('./routes');

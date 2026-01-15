@@ -48,17 +48,18 @@ const getFarmerProfile = async (req, res) => {
  */
 const updateFarmerProfile = async (req, res) => {
   try {
-    const { 
-      name, 
-      fatherOrHusbandName, 
-      email, 
-      caste, 
-      isWomenFarmer, 
-      villageName, 
-      panchayatName, 
+    const {
+      name,
+      fatherOrHusbandName,
+      email,
+      caste,
+      isWomenFarmer,
+      villageName,
+      panchayatName,
       groupName,
       plants,
-      cropData
+      cropData,
+      landSize
     } = req.body;
 
     // Find farmer
@@ -81,6 +82,7 @@ const updateFarmerProfile = async (req, res) => {
     if (groupName) farmer.groupName = groupName;
     if (plants) farmer.plants = plants;
     if (cropData) farmer.cropData = cropData;
+    if (landSize) farmer.landSize = landSize;
 
     // Save updated farmer
     await farmer.save();
@@ -140,6 +142,23 @@ const uploadFieldPhotos = async (req, res) => {
     // Add photos to farmer's record
     farmer.fieldPhotos.push(...uploadedPhotos);
     await farmer.save();
+
+    // Update field status if provided
+    if (req.body.healthStatus) {
+      let fieldStatus = await FieldStatus.findOne({ farmerID: farmer._id });
+
+      if (!fieldStatus) {
+        fieldStatus = new FieldStatus({
+          farmerID: farmer._id,
+          healthStatus: req.body.healthStatus
+        });
+      } else {
+        fieldStatus.healthStatus = req.body.healthStatus;
+        fieldStatus.lastUpdated = Date.now();
+      }
+
+      await fieldStatus.save();
+    }
 
     res.status(200).json({
       success: true,
@@ -375,8 +394,8 @@ const getIncome = async (req, res) => {
       currentIncome: farmer.income,
       estimatedIncome: farmer.estimatedIncome,
       difference: farmer.estimatedIncome - farmer.income,
-      percentAchieved: farmer.estimatedIncome > 0 
-        ? (farmer.income / farmer.estimatedIncome) * 100 
+      percentAchieved: farmer.estimatedIncome > 0
+        ? (farmer.income / farmer.estimatedIncome) * 100
         : 0,
       history: [
         {
@@ -521,9 +540,19 @@ const updateRequestStatus = async (req, res) => {
  */
 const getFarmers = async (req, res) => {
   try {
-    const farmers = await Farmer.find()
+    const farmersDoc = await Farmer.find()
       .populate('assignedExecutive', 'name email phone')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Attach field status to each farmer
+    const farmers = await Promise.all(farmersDoc.map(async (farmer) => {
+      const status = await FieldStatus.findOne({ farmerID: farmer._id });
+      return {
+        ...farmer,
+        fieldStatus: status || { health: 'unknown' } // Default if null
+      };
+    }));
 
     res.status(200).json({
       success: true,
@@ -594,7 +623,7 @@ const updateFarmer = async (req, res) => {
     farmer.villageName = villageName || farmer.villageName;
     farmer.panchayatName = panchayatName || farmer.panchayatName;
     farmer.mobileNo = mobileNo || farmer.mobileNo;
-    
+
     if (assignedExecutive) {
       // Verify executive exists
       const executive = await Executive.findById(assignedExecutive);
@@ -700,6 +729,42 @@ const generateFarmerReport = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Delete field photo
+ * @route   DELETE /api/farmer/field-photos/:id
+ * @access  Private/Farmer
+ */
+const deleteFieldPhoto = async (req, res) => {
+  try {
+    const farmer = await Farmer.findById(req.user._id);
+    if (!farmer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Farmer not found'
+      });
+    }
+
+    // Filter out the photo
+    farmer.fieldPhotos = farmer.fieldPhotos.filter(
+      photo => photo._id.toString() !== req.params.id
+    );
+
+    await farmer.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Field photo deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete field photo error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getFarmerProfile,
   updateFarmerProfile,
@@ -715,5 +780,6 @@ module.exports = {
   getFarmers,
   getFarmerById,
   updateFarmer,
-  deleteFarmer
+  deleteFarmer,
+  deleteFieldPhoto
 };

@@ -2,6 +2,7 @@ const Executive = require('../models/Executive');
 const Farmer = require('../models/Farmer');
 const Request = require('../models/Request');
 const FieldStatus = require('../models/FieldStatus');
+const FieldPhoto = require('../models/FieldPhoto');
 const generateToken = require('../utils/generateToken');
 const smsService = require('../utils/smsService');
 const upload = require('../utils/fileUpload');
@@ -23,8 +24,8 @@ const loginExecutive = async (req, res) => {
       });
     }
 
-    // Check if executive exists
-    const executive = await Executive.findOne({ email });
+    // Check if executive exists - must include password for authentication
+    const executive = await Executive.findOne({ email }).select('+password');
     if (!executive) {
       return res.status(401).json({
         success: false,
@@ -71,17 +72,17 @@ const loginExecutive = async (req, res) => {
  */
 const addFarmer = async (req, res) => {
   try {
-    const { 
-      name, 
-      fatherOrHusbandName, 
-      mobileNo, 
-      email, 
-      password, 
-      caste, 
-      isWomenFarmer, 
-      villageName, 
-      panchayatName, 
-      groupName 
+    const {
+      name,
+      fatherOrHusbandName,
+      mobileNo,
+      email,
+      password,
+      caste,
+      isWomenFarmer,
+      villageName,
+      panchayatName,
+      groupName
     } = req.body;
 
     // Validate required fields
@@ -265,6 +266,92 @@ const updateAlerts = async (req, res) => {
 };
 
 /**
+ * @desc    Send SMS to farmers
+ * @route   POST /api/executive/sms
+ * @access  Private/Executive
+ */
+const sendSMS = async (req, res) => {
+  try {
+    const { message, farmerIds } = req.body;
+
+    // Validate input
+    if (!message || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a message'
+      });
+    }
+
+    if (!farmerIds || farmerIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select at least one farmer'
+      });
+    }
+
+    // Get farmers that are assigned to this executive
+    const farmers = await Farmer.find({
+      _id: { $in: farmerIds },
+      assignedExecutive: req.user._id
+    }).select('name mobileNo');
+
+    if (farmers.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No valid farmers found'
+      });
+    }
+
+    // Get phone numbers
+    const phoneNumbers = farmers.map(f => f.mobileNo).filter(Boolean);
+
+    if (phoneNumbers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid phone numbers found for selected farmers'
+      });
+    }
+
+    // Send bulk SMS
+    const smsResult = await smsService.sendBulkSMS(phoneNumbers, message);
+
+    // Log SMS to executive's record
+    await Executive.findByIdAndUpdate(
+      req.user._id,
+      {
+        $push: {
+          smsLogs: {
+            message: message,
+            sentTo: phoneNumbers,
+            timestamp: new Date(),
+            status: 'sent',
+            recipientCount: phoneNumbers.length
+          }
+        },
+        $inc: { smsSent: phoneNumbers.length }
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `SMS sent successfully to ${phoneNumbers.length} farmer(s)`,
+      data: {
+        totalSent: smsResult.totalSent,
+        recipients: farmers.map(f => ({ name: f.name, mobileNo: f.mobileNo })),
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Send SMS error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send SMS',
+      error: error.message
+    });
+  }
+};
+
+/**
  * @desc    View requests dashboard
  * @route   GET /api/executive/dashboard
  * @access  Private/Executive
@@ -306,7 +393,7 @@ const getDashboard = async (req, res) => {
 
     // Get farmer statistics
     const farmerCount = executive.assignedFarmers.length;
-    
+
     // Get income statistics
     const incomeStats = await Farmer.aggregate([
       {
@@ -354,84 +441,6 @@ const getDashboard = async (req, res) => {
 };
 
 /**
- * @desc    Send SMS to farmers
- * @route   POST /api/executive/sms
- * @access  Private/Executive
- */
-const sendSMS = async (req, res) => {
-  try {
-    const { message, farmerIds } = req.body;
-
-    // Validate input
-    if (!message) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide message content'
-      });
-    }
-
-    // If no specific farmers provided, get all assigned farmers
-    let farmers = [];
-    if (!farmerIds || farmerIds.length === 0) {
-      const executive = await Executive.findById(req.user._id);
-      if (!executive) {
-        return res.status(404).json({
-          success: false,
-          message: 'Executive not found'
-        });
-      }
-      farmers = await Farmer.find({ _id: { $in: executive.assignedFarmers } });
-    } else {
-      // Get specified farmers that are assigned to this executive
-      farmers = await Farmer.find({
-        _id: { $in: farmerIds },
-        assignedExecutive: req.user._id
-      });
-    }
-
-    if (farmers.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'No farmers found'
-      });
-    }
-
-    // Extract phone numbers
-    const phoneNumbers = farmers.map(farmer => farmer.mobileNo);
-
-    // Send bulk SMS
-    const smsResult = await smsService.sendBulkSMS(phoneNumbers, message);
-
-    // Log SMS in executive's record
-    await Executive.findByIdAndUpdate(
-      req.user._id,
-      {
-        $push: {
-          smsLogs: {
-            message,
-            sentTo: phoneNumbers,
-            timestamp: Date.now()
-          }
-        }
-      }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'SMS sent successfully',
-      smsResult
-    });
-  } catch (error) {
-    console.error('Send SMS error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-};
-
-/**
  * @desc    View carbon credit data
  * @route   GET /api/executive/carbon-credits
  * @access  Private/Executive
@@ -450,13 +459,13 @@ const getCarbonCredits = async (req, res) => {
     // In a real system, this would calculate actual carbon credits
     // For this demo, we'll generate placeholder data
     const farmers = await Farmer.find({ _id: { $in: executive.assignedFarmers } });
-    
+
     // Generate placeholder carbon credit data
     const carbonCredits = farmers.map(farmer => {
       // Calculate based on number of plants (simplified example)
       const plantCount = farmer.plants ? farmer.plants.length : 0;
       const creditValue = plantCount * 0.5; // Simplified calculation
-      
+
       return {
         farmerId: farmer._id,
         farmerName: farmer.name,
@@ -558,12 +567,12 @@ const getPlantDetails = async (req, res) => {
  */
 const uploadFieldPhotos = async (req, res) => {
   try {
-    // Check if farmerId is provided
-    const { farmerId } = req.body;
-    if (!farmerId) {
+    // Check if farmerId and fieldId are provided
+    const { farmerId, fieldId } = req.body;
+    if (!farmerId || !fieldId) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide farmer ID'
+        message: 'Please provide farmer ID and field ID'
       });
     }
 
@@ -588,16 +597,45 @@ const uploadFieldPhotos = async (req, res) => {
       });
     }
 
-    // Process uploaded files
-    const uploadedPhotos = req.files.map(file => ({
-      url: `/uploads/images/${file.filename}`,
-      uploadedAt: Date.now(),
-      uploadedBy: 'executive'
+    // Process uploaded files and save to FieldPhoto model
+    const uploadedPhotos = await Promise.all(req.files.map(async file => {
+      const fieldPhoto = await FieldPhoto.create({
+        field: fieldId,
+        farmer: farmerId,
+        photoUrl: file.path, // Cloudinary URL provided by Multer-Cloudinary
+        description: file.originalname,
+        uploadedAt: Date.now(),
+        verifiedBy: req.user._id,
+        isVerified: true,
+        metadata: {
+          format: file.mimetype,
+          size: file.size
+        }
+      });
+      return {
+        _id: fieldPhoto._id,
+        url: fieldPhoto.photoUrl,
+        description: fieldPhoto.description,
+        uploadDate: fieldPhoto.createdAt
+      };
     }));
 
-    // Add photos to farmer's record
-    farmer.fieldPhotos.push(...uploadedPhotos);
-    await farmer.save();
+    // Update field status if provided
+    if (req.body.healthStatus) {
+      let fieldStatus = await FieldStatus.findOne({ farmerID: farmer._id });
+
+      if (!fieldStatus) {
+        fieldStatus = new FieldStatus({
+          farmerID: farmer._id,
+          healthStatus: req.body.healthStatus
+        });
+      } else {
+        fieldStatus.healthStatus = req.body.healthStatus;
+        fieldStatus.lastUpdated = Date.now();
+      }
+
+      await fieldStatus.save();
+    }
 
     // Update executive's field logs
     await Executive.findByIdAndUpdate(
@@ -616,6 +654,118 @@ const uploadFieldPhotos = async (req, res) => {
     });
   } catch (error) {
     console.error('Upload field photos error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Get all fields for assigned farmers
+ * @route   GET /api/executive/fields
+ * @access  Private/Executive
+ */
+const getFields = async (req, res) => {
+  try {
+    const executive = await Executive.findById(req.user._id);
+    if (!executive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Executive not found'
+      });
+    }
+
+    const fields = await require('../models/Field').find({
+      farmer: { $in: executive.assignedFarmers }
+    })
+      .populate('farmer', 'name villageName')
+      .populate('photos')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: fields.length,
+      fields
+    });
+  } catch (error) {
+    console.error('Get fields error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Create a new field
+ * @route   POST /api/executive/fields
+ * @access  Private/Executive
+ */
+const createField = async (req, res) => {
+  try {
+    const {
+      farmerId,
+      name,
+      size,
+      unit,
+      crop,
+      soilType,
+      irrigationSource,
+      address,
+      village,
+      district,
+      state
+    } = req.body;
+
+    if (!farmerId || !name || !size || !address) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields (Farmer, Name, Size, Address)'
+      });
+    }
+
+    // Verify farmer exists
+    const farmer = await Farmer.findById(farmerId);
+    if (!farmer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Farmer not found'
+      });
+    }
+
+    const field = await require('../models/Field').create({
+      farmer: farmerId,
+      name,
+      size: {
+        value: size,
+        unit: unit || 'acres'
+      },
+      crop: {
+        current: crop || ''
+      },
+      soilType: soilType || 'other',
+      irrigationSource: irrigationSource || 'rainfed',
+      location: {
+        type: 'Point',
+        coordinates: [0, 0], // Default coordinates since we don't have map picker yet
+        address: address,
+        village: village || farmer.villageName,
+        district: district || farmer.address?.district || '',
+        state: state || farmer.address?.state || ''
+      }
+    });
+
+    await field.populate('farmer', 'name villageName');
+
+    res.status(201).json({
+      success: true,
+      data: field
+    });
+  } catch (error) {
+    console.error('Create field error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -661,8 +811,8 @@ const getIncomeAnalysis = async (req, res) => {
 
       // Calculate difference and percentage
       const difference = farmer.estimatedIncome - farmer.income;
-      const percentDifference = farmer.estimatedIncome > 0 
-        ? (difference / farmer.estimatedIncome) * 100 
+      const percentDifference = farmer.estimatedIncome > 0
+        ? (difference / farmer.estimatedIncome) * 100
         : 0;
 
       incomeAnalysis.farmerAnalysis.push({
@@ -784,6 +934,8 @@ module.exports = {
   getCarbonCredits,
   getPlantDetails,
   uploadFieldPhotos,
+  getFields,
+  createField,
   getIncomeAnalysis,
   getSchemes
 };

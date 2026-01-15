@@ -75,6 +75,8 @@ const ExecutiveManagement = () => {
   }
 
   // For demo purposes, simulate API response with mock data
+  // For demo purposes, simulate API response with mock data
+  /*
   useEffect(() => {
     const simulateApiResponse = () => {
       setTimeout(() => {
@@ -134,22 +136,25 @@ const ExecutiveManagement = () => {
     // In production, use the actual API call
     // fetchExecutives()
   }, [])
+  */
 
   const handleAddExecutive = async () => {
     try {
       setLoading(true)
-      const response = await axios.post('/api/admin/executive', newExecutive)
-      
-      // In a real app, we would use the response data
-      // For demo, we'll simulate adding to the list
-      const mockNewExecutive = {
-        ...newExecutive,
-        _id: Date.now().toString(),
-        assignedFarmers: 0,
-        createdAt: new Date().toISOString(),
+      const response = await axios.post('/api/admin/executives', newExecutive)
+
+      // Use the actual response data from the API
+      if (response.data.success && response.data.executive) {
+        const addedExecutive = {
+          ...response.data.executive,
+          _id: response.data.executive.id,
+          assignedFarmers: 0,
+          createdAt: new Date().toISOString(),
+          phno: newExecutive.phno,
+        }
+        setExecutives([...executives, addedExecutive])
       }
-      
-      setExecutives([...executives, mockNewExecutive])
+
       setOpenAddDialog(false)
       setNewExecutive({
         name: '',
@@ -160,14 +165,21 @@ const ExecutiveManagement = () => {
       })
       setSnackbar({
         open: true,
-        message: 'Executive added successfully!',
+        message: response.data.message || 'Executive added successfully!',
         severity: 'success',
       })
     } catch (err) {
       console.error('Error adding executive:', err)
+
+      // Get the error message from API response or use a fallback
+      const errorMessage = err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        'Failed to add executive. Please try again.'
+
       setSnackbar({
         open: true,
-        message: 'Failed to add executive. Please try again.',
+        message: errorMessage,
         severity: 'error',
       })
     } finally {
@@ -180,8 +192,8 @@ const ExecutiveManagement = () => {
 
     try {
       setLoading(true)
-      await axios.delete(`/api/admin/executive/${selectedExecutive._id}`)
-      
+      await axios.delete(`/api/admin/executives/${selectedExecutive._id}`)
+
       // Update the local state by filtering out the deleted executive
       setExecutives(executives.filter(exec => exec._id !== selectedExecutive._id))
       setOpenDeleteDialog(false)
@@ -193,9 +205,16 @@ const ExecutiveManagement = () => {
       })
     } catch (err) {
       console.error('Error deleting executive:', err)
+
+      // Get the error message from API response or use a fallback
+      const errorMessage = err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        'Failed to delete executive. Please try again.'
+
       setSnackbar({
         open: true,
-        message: 'Failed to delete executive. Please try again.',
+        message: errorMessage,
         severity: 'error',
       })
     } finally {
@@ -282,7 +301,7 @@ const ExecutiveManagement = () => {
                 Total Farmers Managed
               </Typography>
               <Typography variant="h3">
-                {executives.reduce((sum, exec) => sum + exec.assignedFarmers, 0)}
+                {executives.reduce((sum, exec) => sum + (Array.isArray(exec.assignedFarmers) ? exec.assignedFarmers.length : (typeof exec.assignedFarmers === 'number' ? exec.assignedFarmers : 0)), 0)}
               </Typography>
             </CardContent>
           </Card>
@@ -296,11 +315,11 @@ const ExecutiveManagement = () => {
               <Typography variant="h3">
                 {executives.length > 0
                   ? Math.round(
-                      executives.reduce(
-                        (sum, exec) => sum + exec.assignedFarmers,
-                        0
-                      ) / executives.length
-                    )
+                    executives.reduce(
+                      (sum, exec) => sum + (Array.isArray(exec.assignedFarmers) ? exec.assignedFarmers.length : (typeof exec.assignedFarmers === 'number' ? exec.assignedFarmers : 0)),
+                      0
+                    ) / executives.length
+                  )
                   : 0}
               </Typography>
             </CardContent>
@@ -337,7 +356,20 @@ const ExecutiveManagement = () => {
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>{executive.assignedFarmers}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const value = executive.assignedFarmers
+                      if (Array.isArray(value)) {
+                        return value.length > 0 && typeof value[0] === 'object'
+                          ? `${value.length} (e.g. ${value[0].name})`
+                          : value.length
+                      }
+                      if (typeof value === 'object' && value !== null) {
+                        return value.name || JSON.stringify(value)
+                      }
+                      return value
+                    })()}
+                  </TableCell>
                   <TableCell>
                     {new Date(executive.createdAt).toLocaleDateString()}
                   </TableCell>
@@ -484,7 +516,20 @@ const ExecutiveManagement = () => {
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2">Assigned Farmers</Typography>
-                  <Typography variant="body1">{selectedExecutive.assignedFarmers}</Typography>
+                  <Typography variant="body1">
+                    {(() => {
+                      const value = selectedExecutive.assignedFarmers
+                      if (Array.isArray(value)) {
+                        return value.length > 0 && typeof value[0] === 'object'
+                          ? `${value.length} (e.g. ${value[0].name})`
+                          : value.length
+                      }
+                      if (typeof value === 'object' && value !== null) {
+                        return value.name || JSON.stringify(value)
+                      }
+                      return value
+                    })()}
+                  </Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2">Created At</Typography>

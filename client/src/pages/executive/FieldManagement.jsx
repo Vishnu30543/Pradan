@@ -72,6 +72,20 @@ const FieldManagement = () => {
     message: '',
     severity: 'success',
   })
+  const [selectedStatus, setSelectedStatus] = useState('green')
+
+  // Add Field State
+  const [openAddDialog, setOpenAddDialog] = useState(false)
+  const [newField, setNewField] = useState({
+    farmerId: '',
+    name: '',
+    size: '',
+    unit: 'acres',
+    crop: '',
+    soilType: '',
+    irrigationType: '',
+    address: ''
+  })
 
   useEffect(() => {
     fetchFields()
@@ -92,6 +106,45 @@ const FieldManagement = () => {
     }
   }
 
+  const handleAddField = async () => {
+    try {
+      setLoading(true)
+      const payload = {
+        ...newField,
+        irrigationSource: newField.irrigationType
+      }
+
+      const response = await axios.post('/api/executive/fields', payload)
+
+      setFields([response.data.data, ...fields]) // Add new field to top
+      setOpenAddDialog(false)
+      setNewField({
+        farmerId: '',
+        name: '',
+        size: '',
+        unit: 'acres',
+        crop: '',
+        soilType: '',
+        irrigationType: '',
+        address: ''
+      })
+      setSnackbar({
+        open: true,
+        message: 'Field created successfully!',
+        severity: 'success'
+      })
+    } catch (err) {
+      console.error('Error creating field:', err)
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || 'Failed to create field',
+        severity: 'error'
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const fetchFarmers = async () => {
     try {
       const response = await axios.get('/api/executive/farmers')
@@ -101,234 +154,23 @@ const FieldManagement = () => {
     }
   }
 
+  /*
   // For demo purposes, simulate API response with mock data
   useEffect(() => {
     const simulateApiResponse = () => {
       setTimeout(() => {
-        const mockFarmers = [
-          { _id: '1', name: 'Rajesh Kumar', village: 'Sundarpur' },
-          { _id: '2', name: 'Lakshmi Devi', village: 'Chandpur' },
-          { _id: '3', name: 'Suresh Patel', village: 'Rampur' },
-          { _id: '4', name: 'Meena Singh', village: 'Krishnapur' },
-          { _id: '5', name: 'Arjun Reddy', village: 'Nandpur' },
-        ]
-
-        const mockFields = [
-          {
-            _id: 'f1',
-            name: 'North Field',
-            size: '3 acres',
-            crop: 'Rice',
-            soilType: 'Loamy',
-            irrigationType: 'Drip',
-            farmer: {
-              _id: '1',
-              name: 'Rajesh Kumar',
-              village: 'Sundarpur',
-            },
-            lastUpdated: '2023-06-05T10:15:00.000Z',
-            plantCount: 1500,
-            estimatedYield: '12 quintals',
-            photos: [
-              {
-                _id: 'p1',
-                url: 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8cmljZSUyMGZpZWxkfGVufDB8fDB8fHww&w=1000&q=80',
-                uploadDate: '2023-06-01T09:30:00.000Z',
-                description: 'Rice field after irrigation',
-              },
-              {
-                _id: 'p2',
-                url: 'https://images.unsplash.com/photo-1559060017-445fb9722f2a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8cmljZSUyMGZpZWxkfGVufDB8fDB8fHww&w=1000&q=80',
-                uploadDate: '2023-05-15T14:20:00.000Z',
-                description: 'Initial growth stage',
-              },
-            ],
-            history: [
-              {
-                date: '2023-06-05T10:15:00.000Z',
-                action: 'Field inspection',
-                notes: 'Crop growing well, no pest issues',
-              },
-              {
-                date: '2023-05-20T11:30:00.000Z',
-                action: 'Fertilizer application',
-                notes: 'Applied NPK fertilizer',
-              },
-              {
-                date: '2023-05-01T09:00:00.000Z',
-                action: 'Planting',
-                notes: 'Rice planting completed',
-              },
-            ],
-          },
-          {
-            _id: 'f2',
-            name: 'South Field',
-            size: '2 acres',
-            crop: 'Wheat',
-            soilType: 'Clay',
-            irrigationType: 'Flood',
-            farmer: {
-              _id: '1',
-              name: 'Rajesh Kumar',
-              village: 'Sundarpur',
-            },
-            lastUpdated: '2023-06-02T14:30:00.000Z',
-            plantCount: 1000,
-            estimatedYield: '8 quintals',
-            photos: [
-              {
-                _id: 'p3',
-                url: 'https://images.unsplash.com/photo-1536054695485-8b1bd7a7c603?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8d2hlYXQlMjBmaWVsZHxlbnwwfHwwfHx8MA%3D%3D&w=1000&q=80',
-                uploadDate: '2023-06-02T14:30:00.000Z',
-                description: 'Wheat field ready for harvest',
-              },
-            ],
-            history: [
-              {
-                date: '2023-06-02T14:30:00.000Z',
-                action: 'Pre-harvest inspection',
-                notes: 'Crop ready for harvest in 2 weeks',
-              },
-              {
-                date: '2023-04-15T10:00:00.000Z',
-                action: 'Pest control',
-                notes: 'Applied organic pesticide',
-              },
-            ],
-          },
-          {
-            _id: 'f3',
-            name: 'Main Field',
-            size: '3 acres',
-            crop: 'Cotton',
-            soilType: 'Black',
-            irrigationType: 'Sprinkler',
-            farmer: {
-              _id: '2',
-              name: 'Lakshmi Devi',
-              village: 'Chandpur',
-            },
-            lastUpdated: '2023-05-28T14:30:00.000Z',
-            plantCount: 900,
-            estimatedYield: '5 quintals',
-            photos: [
-              {
-                _id: 'p4',
-                url: 'https://images.unsplash.com/photo-1599824701954-d1d3d473f782?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y290dG9uJTIwZmllbGR8ZW58MHx8MHx8fDA%3D&w=1000&q=80',
-                uploadDate: '2023-05-28T14:30:00.000Z',
-                description: 'Cotton field flowering stage',
-              },
-            ],
-            history: [
-              {
-                date: '2023-05-28T14:30:00.000Z',
-                action: 'Field inspection',
-                notes: 'Good flowering, applied additional fertilizer',
-              },
-              {
-                date: '2023-04-10T09:30:00.000Z',
-                action: 'Planting',
-                notes: 'Cotton planting completed',
-              },
-            ],
-          },
-          {
-            _id: 'f4',
-            name: 'East Field',
-            size: '4 acres',
-            crop: 'Wheat',
-            soilType: 'Loamy',
-            irrigationType: 'Tube Well',
-            farmer: {
-              _id: '3',
-              name: 'Suresh Patel',
-              village: 'Rampur',
-            },
-            lastUpdated: '2023-06-10T09:00:00.000Z',
-            plantCount: 2000,
-            estimatedYield: '16 quintals',
-            photos: [
-              {
-                _id: 'p5',
-                url: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8d2hlYXQlMjBmaWVsZHxlbnwwfHwwfHx8MA%3D%3D&w=1000&q=80',
-                uploadDate: '2023-06-10T09:00:00.000Z',
-                description: 'Wheat field with good growth',
-              },
-            ],
-            history: [
-              {
-                date: '2023-06-10T09:00:00.000Z',
-                action: 'Field inspection',
-                notes: 'Crop in excellent condition',
-              },
-              {
-                date: '2023-05-05T11:00:00.000Z',
-                action: 'Fertilizer application',
-                notes: 'Applied urea',
-              },
-              {
-                date: '2023-04-01T08:30:00.000Z',
-                action: 'Planting',
-                notes: 'Wheat planting completed',
-              },
-            ],
-          },
-          {
-            _id: 'f5',
-            name: 'West Field',
-            size: '4 acres',
-            crop: 'Vegetables',
-            soilType: 'Sandy Loam',
-            irrigationType: 'Drip',
-            farmer: {
-              _id: '3',
-              name: 'Suresh Patel',
-              village: 'Rampur',
-            },
-            lastUpdated: '2023-06-08T10:30:00.000Z',
-            plantCount: 3000,
-            estimatedYield: '20 quintals',
-            photos: [
-              {
-                _id: 'p6',
-                url: 'https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8dmVnZXRhYmxlJTIwZmllbGR8ZW58MHx8MHx8fDA%3D&w=1000&q=80',
-                uploadDate: '2023-06-08T10:30:00.000Z',
-                description: 'Mixed vegetable field',
-              },
-            ],
-            history: [
-              {
-                date: '2023-06-08T10:30:00.000Z',
-                action: 'Field inspection',
-                notes: 'Vegetables growing well, harvesting started for some crops',
-              },
-              {
-                date: '2023-05-10T09:00:00.000Z',
-                action: 'Pest control',
-                notes: 'Applied neem-based pesticide',
-              },
-              {
-                date: '2023-04-15T08:00:00.000Z',
-                action: 'Planting',
-                notes: 'Mixed vegetable planting completed',
-              },
-            ],
-          },
-        ]
-
-        setFarmers(mockFarmers)
-        setFields(mockFields)
+        // ... (mock data code) ...
         setLoading(false)
       }, 1000)
     }
 
     // Use mock data for demo
-    simulateApiResponse()
+    // simulateApiResponse()
     // In production, use the actual API calls
     // fetchFields()
     // fetchFarmers()
   }, [])
+  */
 
   const handleFileChange = (event) => {
     setUploadFiles(Array.from(event.target.files))
@@ -339,36 +181,45 @@ const FieldManagement = () => {
 
     try {
       setUploadLoading(true)
-      
-      // In a real app, you would create a FormData object and send the files
-      // const formData = new FormData()
-      // uploadFiles.forEach(file => formData.append('photos', file))
-      // await axios.post(`/api/executive/fields/${selectedField._id}/photos`, formData)
 
-      // Simulate API response for demo
-      setTimeout(() => {
-        // Create mock photo objects
-        const newPhotos = uploadFiles.map((file, index) => ({
-          _id: `new-photo-${Date.now()}-${index}`,
-          url: URL.createObjectURL(file), // This creates a temporary URL for preview
-          uploadDate: new Date().toISOString(),
-          description: `New photo uploaded on ${new Date().toLocaleDateString()}`,
-        }))
+      const formData = new FormData()
+      // Append each file to 'photos' field
+      uploadFiles.forEach(file => {
+        formData.append('photos', file)
+      })
+      // Append farmerId as required by the backend controller
+      formData.append('farmerId', selectedField.farmer._id)
+      // Append fieldId
+      formData.append('fieldId', selectedField._id)
 
-        // Update the fields state with new photos
+      if (selectedStatus) {
+        formData.append('healthStatus', selectedStatus)
+      }
+
+      // Send to backend
+      const response = await axios.post('/api/executive/field-photos', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+
+      if (response.data.success) {
+        // Update the fields state with new photos from response
+        const newPhotos = response.data.photos || []
+
         const updatedFields = fields.map(field => {
           if (field._id === selectedField._id) {
             return {
               ...field,
-              photos: [...field.photos, ...newPhotos],
+              photos: [...(field.photos || []), ...newPhotos],
               lastUpdated: new Date().toISOString(),
               history: [
                 {
                   date: new Date().toISOString(),
                   action: 'Photo upload',
-                  notes: `Uploaded ${uploadFiles.length} new photos`,
+                  notes: `Uploaded ${newPhotos.length} new photos`,
                 },
-                ...field.history,
+                ...(field.history || []),
               ],
             }
           }
@@ -382,18 +233,18 @@ const FieldManagement = () => {
         setSelectedField(updatedField)
         setUploadFiles([])
         setOpenUploadDialog(false)
-        setUploadLoading(false)
         setSnackbar({
           open: true,
           message: `Successfully uploaded ${newPhotos.length} photos`,
           severity: 'success',
         })
-      }, 1500)
+      }
+      setUploadLoading(false)
     } catch (err) {
       console.error('Error uploading photos:', err)
       setSnackbar({
         open: true,
-        message: 'Failed to upload photos. Please try again.',
+        message: err.response?.data?.message || 'Failed to upload photos. Please try again.',
         severity: 'error',
       })
       setUploadLoading(false)
@@ -421,14 +272,14 @@ const FieldManagement = () => {
 
   // Filter fields based on search term and filters
   const filteredFields = fields.filter(field => {
-    const matchesSearch = 
+    const matchesSearch =
       field.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       field.farmer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       field.crop.toLowerCase().includes(searchTerm.toLowerCase())
-    
+
     const matchesFarmer = filterFarmer ? field.farmer._id === filterFarmer : true
     const matchesCrop = filterCrop ? field.crop === filterCrop : true
-    
+
     return matchesSearch && matchesFarmer && matchesCrop
   })
 
@@ -524,7 +375,7 @@ const FieldManagement = () => {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              disabled
+              onClick={() => setOpenAddDialog(true)}
             >
               Add Field
             </Button>
@@ -541,7 +392,7 @@ const FieldManagement = () => {
                 <CardMedia
                   component="img"
                   height="140"
-                  image={field.photos && field.photos.length > 0 ? field.photos[0].url : 'https://via.placeholder.com/300x140?text=No+Image'}
+                  image={field.photos && field.photos.length > 0 ? (field.photos[0].photoUrl || field.photos[0].url) : 'https://via.placeholder.com/300x140?text=No+Image'}
                   alt={field.name}
                 />
                 <CardContent>
@@ -550,10 +401,10 @@ const FieldManagement = () => {
                   </Typography>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2" color="text.secondary">
-                      {field.farmer.name}
+                      {field.farmer?.name || 'Unknown Farmer'}
                     </Typography>
                     <Chip
-                      label={field.crop}
+                      label={typeof field.crop === 'object' ? field.crop.current : field.crop || 'Unknown'}
                       size="small"
                       color="primary"
                       variant="outlined"
@@ -563,22 +414,22 @@ const FieldManagement = () => {
                   <Grid container spacing={1}>
                     <Grid item xs={6}>
                       <Typography variant="body2">
-                        <strong>Size:</strong> {field.size}
+                        <strong>Size:</strong> {typeof field.size === 'object' ? `${field.size.value} ${field.size.unit}` : field.size}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="body2">
-                        <strong>Soil:</strong> {field.soilType}
+                        <strong>Soil:</strong> {field.soilType || 'N/A'}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="body2">
-                        <strong>Irrigation:</strong> {field.irrigationType}
+                        <strong>Irrigation:</strong> {field.irrigationSource || field.irrigationType || 'N/A'}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="body2">
-                        <strong>Plants:</strong> {field.plantCount.toLocaleString()}
+                        <strong>Plants:</strong> {(field.plantCount || 0).toLocaleString()}
                       </Typography>
                     </Grid>
                   </Grid>
@@ -596,6 +447,7 @@ const FieldManagement = () => {
                     startIcon={<PhotoCameraIcon />}
                     onClick={() => {
                       setSelectedField(field)
+                      setSelectedStatus('green')
                       setOpenUploadDialog(true)
                     }}
                   >
@@ -627,7 +479,7 @@ const FieldManagement = () => {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="h6">{selectedField.name}</Typography>
                 <Chip
-                  label={selectedField.crop}
+                  label={typeof selectedField.crop === 'object' ? selectedField.crop.current : selectedField.crop}
                   color="primary"
                   variant="outlined"
                 />
@@ -650,10 +502,10 @@ const FieldManagement = () => {
                           Farmer Information
                         </Typography>
                         <Typography variant="body1">
-                          {selectedField.farmer.name}
+                          {selectedField.farmer?.name || 'Unknown Farmer'}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {selectedField.farmer.village}
+                          {selectedField.location?.village || selectedField.farmer?.village || 'Unknown Location'}
                         </Typography>
                       </CardContent>
                     </Card>
@@ -667,22 +519,22 @@ const FieldManagement = () => {
                         <Grid container spacing={1}>
                           <Grid item xs={6}>
                             <Typography variant="body2">
-                              <strong>Size:</strong> {selectedField.size}
+                              <strong>Size:</strong> {typeof selectedField.size === 'object' ? `${selectedField.size.value} ${selectedField.size.unit}` : selectedField.size}
                             </Typography>
                           </Grid>
                           <Grid item xs={6}>
                             <Typography variant="body2">
-                              <strong>Crop:</strong> {selectedField.crop}
+                              <strong>Crop:</strong> {typeof selectedField.crop === 'object' ? selectedField.crop.current : selectedField.crop}
                             </Typography>
                           </Grid>
                           <Grid item xs={6}>
                             <Typography variant="body2">
-                              <strong>Soil Type:</strong> {selectedField.soilType}
+                              <strong>Soil Type:</strong> {selectedField.soilType || 'N/A'}
                             </Typography>
                           </Grid>
                           <Grid item xs={6}>
                             <Typography variant="body2">
-                              <strong>Irrigation:</strong> {selectedField.irrigationType}
+                              <strong>Irrigation:</strong> {selectedField.irrigationSource || selectedField.irrigationType || 'N/A'}
                             </Typography>
                           </Grid>
                         </Grid>
@@ -698,18 +550,18 @@ const FieldManagement = () => {
                         <Grid container spacing={1}>
                           <Grid item xs={6}>
                             <Typography variant="body2">
-                              <strong>Plant Count:</strong> {selectedField.plantCount.toLocaleString()}
+                              <strong>Plant Count:</strong> {(selectedField.plantCount || 0).toLocaleString()}
                             </Typography>
                           </Grid>
                           <Grid item xs={6}>
                             <Typography variant="body2">
-                              <strong>Est. Yield:</strong> {selectedField.estimatedYield}
+                              <strong>Est. Yield:</strong> {selectedField.estimatedYield || 'N/A'}
                             </Typography>
                           </Grid>
                           <Grid item xs={12}>
                             <Typography variant="body2">
                               <strong>Last Updated:</strong>{' '}
-                              {new Date(selectedField.lastUpdated).toLocaleDateString()}
+                              {new Date(selectedField.updatedAt || selectedField.lastUpdated || Date.now()).toLocaleDateString()}
                             </Typography>
                           </Grid>
                         </Grid>
@@ -725,7 +577,7 @@ const FieldManagement = () => {
                         {selectedField.photos && selectedField.photos.length > 0 ? (
                           <Box sx={{ position: 'relative' }}>
                             <img
-                              src={selectedField.photos[0].url}
+                              src={selectedField.photos[0].photoUrl || selectedField.photos[0].url}
                               alt="Latest field photo"
                               style={{ width: '100%', borderRadius: '4px' }}
                             />
@@ -753,7 +605,7 @@ const FieldManagement = () => {
                             <CardMedia
                               component="img"
                               height="200"
-                              image={photo.url}
+                              image={photo.photoUrl || photo.url}
                               alt={photo.description || 'Field photo'}
                             />
                             <CardContent>
@@ -761,7 +613,7 @@ const FieldManagement = () => {
                                 {photo.description}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                Uploaded: {new Date(photo.uploadDate).toLocaleDateString()}
+                                Uploaded: {new Date(photo.createdAt || photo.uploadDate || Date.now()).toLocaleDateString()}
                               </Typography>
                             </CardContent>
                           </Card>
@@ -778,7 +630,7 @@ const FieldManagement = () => {
                         variant="outlined"
                         startIcon={<CloudUploadIcon />}
                         sx={{ mt: 2 }}
-                        onClick={() => setOpenUploadDialog(true)}
+                        onClick={() => { setSelectedStatus('green'); setOpenUploadDialog(true) }}
                       >
                         Upload Photos
                       </Button>
@@ -822,7 +674,7 @@ const FieldManagement = () => {
                 startIcon={<CloudUploadIcon />}
                 variant="outlined"
                 color="primary"
-                onClick={() => setOpenUploadDialog(true)}
+                onClick={() => { setSelectedStatus('green'); setOpenUploadDialog(true) }}
               >
                 Upload Photos
               </Button>
@@ -847,6 +699,19 @@ const FieldManagement = () => {
                 {selectedField.name} - {selectedField.farmer.name}
               </Typography>
               <Box sx={{ my: 2 }}>
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>Field Health Status</InputLabel>
+                  <Select
+                    value={selectedStatus}
+                    label="Field Health Status"
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                  >
+                    <MenuItem value="green">Healthy (Green)</MenuItem>
+                    <MenuItem value="yellow">Needs Attention (Yellow)</MenuItem>
+                    <MenuItem value="red">Critical (Red)</MenuItem>
+                  </Select>
+                </FormControl>
+
                 <Button
                   variant="outlined"
                   component="label"
@@ -902,6 +767,119 @@ const FieldManagement = () => {
             startIcon={uploadLoading ? <CircularProgress size={20} /> : <CloudUploadIcon />}
           >
             {uploadLoading ? 'Uploading...' : 'Upload'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Field Dialog */}
+      <Dialog open={openAddDialog} onClose={() => setOpenAddDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add New Field</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Select Farmer</InputLabel>
+                <Select
+                  value={newField.farmerId}
+                  label="Select Farmer"
+                  onChange={(e) => setNewField({ ...newField, farmerId: e.target.value })}
+                >
+                  {farmers.map((farmer) => (
+                    <MenuItem key={farmer._id} value={farmer._id}>
+                      {farmer.name} ({farmer.village})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Field Name"
+                value={newField.name}
+                onChange={(e) => setNewField({ ...newField, name: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="Size"
+                type="number"
+                value={newField.size}
+                onChange={(e) => setNewField({ ...newField, size: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth>
+                <InputLabel>Unit</InputLabel>
+                <Select
+                  value={newField.unit}
+                  label="Unit"
+                  onChange={(e) => setNewField({ ...newField, unit: e.target.value })}
+                >
+                  <MenuItem value="acres">Acres</MenuItem>
+                  <MenuItem value="hectares">Hectares</MenuItem>
+                  <MenuItem value="bigha">Bigha</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Address/Location"
+                value={newField.address}
+                onChange={(e) => setNewField({ ...newField, address: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="Crop"
+                value={newField.crop}
+                onChange={(e) => setNewField({ ...newField, crop: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth>
+                <InputLabel>Soil Type</InputLabel>
+                <Select
+                  value={newField.soilType}
+                  label="Soil Type"
+                  onChange={(e) => setNewField({ ...newField, soilType: e.target.value })}
+                >
+                  <MenuItem value="clay">Clay</MenuItem>
+                  <MenuItem value="sandy">Sandy</MenuItem>
+                  <MenuItem value="loamy">Loamy</MenuItem>
+                  <MenuItem value="other">Other</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Irrigation Source</InputLabel>
+                <Select
+                  value={newField.irrigationType}
+                  label="Irrigation Source"
+                  onChange={(e) => setNewField({ ...newField, irrigationType: e.target.value })}
+                >
+                  <MenuItem value="rainfed">Rainfed</MenuItem>
+                  <MenuItem value="canal">Canal</MenuItem>
+                  <MenuItem value="well">Well</MenuItem>
+                  <MenuItem value="borewell">Borewell</MenuItem>
+                  <MenuItem value="other">Other</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenAddDialog(false)}>Cancel</Button>
+          <Button
+            onClick={handleAddField}
+            variant="contained"
+            disabled={!newField.farmerId || !newField.name || !newField.size || !newField.address}
+          >
+            Create Field
           </Button>
         </DialogActions>
       </Dialog>

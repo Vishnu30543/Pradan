@@ -10,6 +10,7 @@ const Farmer = require('../models/Farmer');
 exports.getFarmerFields = async (req, res) => {
   try {
     const fields = await Field.find({ farmer: req.user._id })
+      .populate('photos')
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -128,14 +129,14 @@ exports.uploadFieldPhoto = async (req, res) => {
 exports.getFieldPhotos = async (req, res) => {
   try {
     const { fieldId } = req.query;
-    
+
     let query = { farmer: req.user._id };
-    
+
     // If fieldId is provided, filter by field
     if (fieldId) {
       query.field = fieldId;
     }
-    
+
     const fieldPhotos = await FieldPhoto.find(query)
       .sort({ createdAt: -1 })
       .populate('field', 'name location size crop');

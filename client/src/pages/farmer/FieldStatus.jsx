@@ -76,7 +76,7 @@ const FieldStatus = () => {
   const [selectedTab, setSelectedTab] = useState(0)
 
   useEffect(() => {
-    fetchFields()
+    // fetchFields()
   }, [])
 
   const fetchFields = async () => {
@@ -1205,8 +1205,8 @@ const FieldStatus = () => {
                                   image.type === 'satellite'
                                     ? 'primary.main'
                                     : image.type === 'drone'
-                                    ? 'secondary.main'
-                                    : 'success.main',
+                                      ? 'secondary.main'
+                                      : 'success.main',
                                 color: 'white',
                               }}
                             />
@@ -1332,7 +1332,7 @@ const FieldStatus = () => {
                                         ),
                                         color:
                                           record.soilMoisture === 'optimal' ||
-                                          record.soilMoisture === 'high'
+                                            record.soilMoisture === 'high'
                                             ? 'white'
                                             : 'inherit',
                                       }}
@@ -1348,7 +1348,7 @@ const FieldStatus = () => {
                                         ),
                                         color:
                                           record.pestDetection === 'medium' ||
-                                          record.pestDetection === 'high'
+                                            record.pestDetection === 'high'
                                             ? 'white'
                                             : 'inherit',
                                       }}
@@ -1366,7 +1366,7 @@ const FieldStatus = () => {
                                         ),
                                         color:
                                           record.diseaseDetection === 'medium' ||
-                                          record.diseaseDetection === 'high'
+                                            record.diseaseDetection === 'high'
                                             ? 'white'
                                             : 'inherit',
                                       }}
@@ -1423,8 +1423,8 @@ const FieldStatus = () => {
                       selectedImage.type === 'satellite'
                         ? 'primary.main'
                         : selectedImage.type === 'drone'
-                        ? 'secondary.main'
-                        : 'success.main',
+                          ? 'secondary.main'
+                          : 'success.main',
                     color: 'white',
                   }}
                 />

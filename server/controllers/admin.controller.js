@@ -16,7 +16,7 @@ const bcrypt = require('bcryptjs');
 const loginAdmin = async (req, res) => {
   console.log('Admin login request:');
   try {
-        console.log('Admin login request:');
+    console.log('Admin login request:');
 
     const { adminname, password } = req.body;
 
@@ -46,14 +46,14 @@ const loginAdmin = async (req, res) => {
     //   });
     // }
     // Example: server/controllers/adminController.js
-    
-const admin = await Admin.findOne({ adminname: req.body.adminname });
-console.log('Admin found:', admin);
-if (!admin) return res.status(400).json({ message: 'Invalid credentials' });
 
-const isMatch = await bcrypt.compare(req.body.password, admin.password);
-console.log(isMatch);
-if (isMatch) return res.status(400).json({ message: 'Invalid credentials' });
+    const admin = await Admin.findOne({ adminname: req.body.adminname });
+    console.log('Admin found:', admin);
+    if (!admin) return res.status(400).json({ message: 'Invalid credentials' });
+
+    const isMatch = await bcrypt.compare(req.body.password, admin.password);
+    console.log(isMatch);
+    if (isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
     // Generate token
     const token = generateToken(admin._id, 'admin');
@@ -102,13 +102,19 @@ const addExecutive = async (req, res) => {
       });
     }
 
+    // Auto-generate employeeId
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const employeeId = `EXE-${timestamp}-${randomSuffix}`;
+
     // Create new executive
     const executive = await Executive.create({
       email,
       password,
       name,
       phno,
-      region
+      region,
+      employeeId
     });
 
     res.status(201).json({
@@ -118,11 +124,23 @@ const addExecutive = async (req, res) => {
         id: executive._id,
         name: executive.name,
         email: executive.email,
-        region: executive.region
+        region: executive.region,
+        employeeId: executive.employeeId
       }
     });
   } catch (error) {
     console.error('Add executive error:', error);
+
+    // Handle specific MongoDB errors
+    if (error.code === 11000) {
+      // Duplicate key error
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({
+        success: false,
+        message: `An executive with this ${field} already exists`
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -281,7 +299,7 @@ const getAnalytics = async (req, res) => {
     // Get counts
     const farmerCount = await Farmer.countDocuments();
     const executiveCount = await Executive.countDocuments();
-    
+
     // Get total plants count
     const farmers = await Farmer.find().select('plants');
     let totalPlantsCount = 0;
@@ -290,7 +308,7 @@ const getAnalytics = async (req, res) => {
         totalPlantsCount += farmer.plants.length;
       }
     });
-    
+
     // Get total and estimated income
     const incomeData = await Farmer.aggregate([
       {
@@ -301,10 +319,10 @@ const getAnalytics = async (req, res) => {
         }
       }
     ]);
-    
+
     const totalIncome = incomeData.length > 0 ? incomeData[0].totalIncome : 0;
     const totalEstimatedIncome = incomeData.length > 0 ? incomeData[0].totalEstimatedIncome : 0;
-    
+
     // Get request statistics
     const requestStats = await Request.aggregate([
       {
@@ -314,7 +332,7 @@ const getAnalytics = async (req, res) => {
         }
       }
     ]);
-    
+
     // Format request stats
     const requestCounts = {
       pending: 0,
@@ -322,13 +340,13 @@ const getAnalytics = async (req, res) => {
       completed: 0,
       rejected: 0
     };
-    
+
     requestStats.forEach(stat => {
       if (stat._id in requestCounts) {
         requestCounts[stat._id] = stat.count;
       }
     });
-    
+
     res.status(200).json({
       success: true,
       analytics: {
@@ -364,61 +382,61 @@ const getAnalytics = async (req, res) => {
 const generateReport = async (req, res) => {
   try {
     const { reportType } = req.body;
-    
+
     if (!reportType) {
       return res.status(400).json({
         success: false,
         message: 'Please provide report type'
       });
     }
-    
+
     // Create a new PDF document
     const doc = new PDFDocument();
-    
+
     // Set response headers for PDF download
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=report-${Date.now()}.pdf`);
-    
+
     // Pipe the PDF document to the response
     doc.pipe(res);
-    
+
     // Add content to the PDF based on report type
     doc.fontSize(25).text('Agricultural Management System Report', {
       align: 'center'
     });
-    
+
     doc.moveDown();
     doc.fontSize(14).text(`Report Type: ${reportType}`, {
       align: 'center'
     });
-    
+
     doc.moveDown();
     doc.fontSize(12).text(`Generated on: ${new Date().toLocaleString()}`, {
       align: 'center'
     });
-    
+
     doc.moveDown().moveDown();
-    
+
     // Add different content based on report type
     if (reportType === 'farmer') {
       // Get farmer statistics
       const farmerCount = await Farmer.countDocuments();
       const farmers = await Farmer.find().select('name villageName panchayatName income estimatedIncome');
-      
+
       doc.fontSize(16).text('Farmer Statistics', {
         underline: true
       });
-      
+
       doc.moveDown();
       doc.fontSize(12).text(`Total Farmers: ${farmerCount}`);
-      
+
       doc.moveDown();
       doc.fontSize(14).text('Farmer List', {
         underline: true
       });
-      
+
       doc.moveDown();
-      
+
       // Create a table-like structure for farmers
       let y = doc.y;
       doc.fontSize(10);
@@ -427,15 +445,15 @@ const generateReport = async (req, res) => {
       doc.text('Panchayat', 300, y);
       doc.text('Income', 400, y);
       doc.text('Est. Income', 470, y);
-      
+
       doc.moveDown();
       y = doc.y;
-      
+
       // Draw a line
       doc.moveTo(50, y).lineTo(550, y).stroke();
-      
+
       doc.moveDown();
-      
+
       // List farmers
       farmers.forEach((farmer, index) => {
         if (index > 0 && index % 25 === 0) {
@@ -448,44 +466,44 @@ const generateReport = async (req, res) => {
           doc.text('Panchayat', 300, y);
           doc.text('Income', 400, y);
           doc.text('Est. Income', 470, y);
-          
+
           doc.moveDown();
           y = doc.y;
-          
+
           // Draw a line
           doc.moveTo(50, y).lineTo(550, y).stroke();
-          
+
           doc.moveDown();
         }
-        
+
         y = doc.y;
         doc.text(farmer.name, 50, y);
         doc.text(farmer.villageName, 200, y);
         doc.text(farmer.panchayatName, 300, y);
         doc.text(`₹${farmer.income.toFixed(2)}`, 400, y);
         doc.text(`₹${farmer.estimatedIncome.toFixed(2)}`, 470, y);
-        
+
         doc.moveDown();
       });
     } else if (reportType === 'executive') {
       // Get executive statistics
       const executiveCount = await Executive.countDocuments();
       const executives = await Executive.find().select('name email region phno');
-      
+
       doc.fontSize(16).text('Executive Statistics', {
         underline: true
       });
-      
+
       doc.moveDown();
       doc.fontSize(12).text(`Total Executives: ${executiveCount}`);
-      
+
       doc.moveDown();
       doc.fontSize(14).text('Executive List', {
         underline: true
       });
-      
+
       doc.moveDown();
-      
+
       // Create a table-like structure for executives
       let y = doc.y;
       doc.fontSize(10);
@@ -493,15 +511,15 @@ const generateReport = async (req, res) => {
       doc.text('Email', 150, y);
       doc.text('Region', 300, y);
       doc.text('Phone', 400, y);
-      
+
       doc.moveDown();
       y = doc.y;
-      
+
       // Draw a line
       doc.moveTo(50, y).lineTo(550, y).stroke();
-      
+
       doc.moveDown();
-      
+
       // List executives
       executives.forEach((executive, index) => {
         if (index > 0 && index % 25 === 0) {
@@ -513,29 +531,29 @@ const generateReport = async (req, res) => {
           doc.text('Email', 150, y);
           doc.text('Region', 300, y);
           doc.text('Phone', 400, y);
-          
+
           doc.moveDown();
           y = doc.y;
-          
+
           // Draw a line
           doc.moveTo(50, y).lineTo(550, y).stroke();
-          
+
           doc.moveDown();
         }
-        
+
         y = doc.y;
         doc.text(executive.name, 50, y);
         doc.text(executive.email, 150, y);
         doc.text(executive.region, 300, y);
         doc.text(executive.phno.toString(), 400, y);
-        
+
         doc.moveDown();
       });
     } else if (reportType === 'analytics') {
       // Get analytics data
       const farmerCount = await Farmer.countDocuments();
       const executiveCount = await Executive.countDocuments();
-      
+
       // Get total plants count
       const farmers = await Farmer.find().select('plants');
       let totalPlantsCount = 0;
@@ -544,7 +562,7 @@ const generateReport = async (req, res) => {
           totalPlantsCount += farmer.plants.length;
         }
       });
-      
+
       // Get total and estimated income
       const incomeData = await Farmer.aggregate([
         {
@@ -555,16 +573,16 @@ const generateReport = async (req, res) => {
           }
         }
       ]);
-      
+
       const totalIncome = incomeData.length > 0 ? incomeData[0].totalIncome : 0;
       const totalEstimatedIncome = incomeData.length > 0 ? incomeData[0].totalEstimatedIncome : 0;
-      
+
       doc.fontSize(16).text('System Analytics', {
         underline: true
       });
-      
+
       doc.moveDown();
-      
+
       // Display analytics data
       doc.fontSize(12).text(`Total Farmers: ${farmerCount}`);
       doc.moveDown();
@@ -577,14 +595,14 @@ const generateReport = async (req, res) => {
       doc.text(`Total Estimated Income: ₹${totalEstimatedIncome.toFixed(2)}`);
       doc.moveDown();
       doc.text(`Income Difference: ₹${(totalEstimatedIncome - totalIncome).toFixed(2)}`);
-      
+
       // Add placeholder for other analytics
       doc.moveDown().moveDown();
       doc.text('Carbon Credits: 1250 units');
       doc.moveDown();
       doc.text('Partner Companies: 8');
     }
-    
+
     // Finalize the PDF and end the stream
     doc.end();
   } catch (error) {
