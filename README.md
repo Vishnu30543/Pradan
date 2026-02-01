@@ -441,7 +441,7 @@ This project is licensed under the **MIT License** - see the LICENSE file for de
 
 For issues, questions, or contributions:
 - **GitHub Issues**: [Create an issue](https://github.com/Vishnu30543/Pradan/issues)
-- **Email**: vishnu30543@example.com (replace with actual email)
+- **Email**: vishnusaiyanduru@gmail.com
 
 ---
 
