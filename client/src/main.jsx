@@ -7,6 +7,14 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import App from './App.jsx'
 import './index.css'
+import axios from 'axios'
+
+// Set axios base URL from environment variable
+// If not set, it defaults to relative path (working with proxy in dev)
+if (import.meta.env.VITE_API_BASE_URL) {
+  axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL
+}
+
 
 // Create a theme instance
 const theme = createTheme({

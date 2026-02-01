@@ -85,7 +85,6 @@ const FarmerManagement = () => {
     panchayatName: '',
     caste: '',
     isWomenFarmer: 'no', // Must be 'yes' or 'no' (string enum)
-    isWomenFarmer: 'no', // Must be 'yes' or 'no' (string enum)
     groupName: '',
     income: '',
     estimatedIncome: ''
@@ -157,7 +156,6 @@ const FarmerManagement = () => {
         villageName: '',
         panchayatName: '',
         caste: '',
-        isWomenFarmer: 'no',
         isWomenFarmer: 'no',
         groupName: '',
         income: '',
