@@ -51,6 +51,11 @@ mongoose.connect(process.env.MONGODB_URI, {
 // Import routes
 const routes = require('./routes');
 
+// Root route
+app.get('/', (req, res) => {
+  res.send('Pradan backend is active');
+});
+
 // Use routes
 app.use('/', routes);
 
