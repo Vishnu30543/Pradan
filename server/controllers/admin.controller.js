@@ -297,17 +297,17 @@ const removeFarmer = async (req, res) => {
 const getAnalytics = async (req, res) => {
   try {
     // Get counts
-    const farmerCount = await Farmer.countDocuments();
-    const executiveCount = await Executive.countDocuments();
+    const [farmerCount, executiveCount] = await Promise.all([
+      Farmer.countDocuments(),
+      Executive.countDocuments()
+    ]);
 
-    // Get total plants count
-    const farmers = await Farmer.find().select('plants');
-    let totalPlantsCount = 0;
-    farmers.forEach(farmer => {
-      if (farmer.plants && Array.isArray(farmer.plants)) {
-        totalPlantsCount += farmer.plants.length;
-      }
-    });
+    // Get total plants count using aggregation
+    const plantStats = await Farmer.aggregate([
+      { $unwind: "$plants" },
+      { $count: "totalPlants" }
+    ]);
+    const totalPlantsCount = plantStats.length > 0 ? plantStats[0].totalPlants : 0;
 
     // Get total and estimated income
     const incomeData = await Farmer.aggregate([
@@ -342,7 +342,7 @@ const getAnalytics = async (req, res) => {
     };
 
     requestStats.forEach(stat => {
-      if (stat._id in requestCounts) {
+      if (stat._id) {
         requestCounts[stat._id] = stat.count;
       }
     });

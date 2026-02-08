@@ -11,7 +11,7 @@ async function addAdmin() {
   await mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
 
   const adminname = 'admin1' // Change as needed
-  const password = 'admin1' // Change as needed
+  const password = 'admin@543' // Change as needed
 
   // Check if admin already exists
   const existing = await Admin.findOne({ adminname })

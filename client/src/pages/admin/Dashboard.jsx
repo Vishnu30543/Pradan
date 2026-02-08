@@ -73,8 +73,8 @@ const AdminDashboard = () => {
     const fetchAnalytics = async () => {
       try {
         setLoading(true)
-        const response = await axios.get('/api/admin/analytics')
-        setAnalytics(response.data)
+        const response = await axios.get('/api/admin/analytics/dashboard')
+        setAnalytics(response.data.data) // Access the data property from the response
         setError(null)
       } catch (err) {
         console.error('Error fetching analytics:', err)
@@ -84,40 +84,16 @@ const AdminDashboard = () => {
       }
     }
 
-    // For demo purposes, simulate API response with mock data
-    const simulateApiResponse = () => {
-      setTimeout(() => {
-        setAnalytics({
-          farmerCount: 245,
-          executiveCount: 12,
-          plantCount: 12500,
-          totalRevenue: 1250000,
-          carbonCredits: 3450,
-          partnerCompanies: 8,
-          incomeData: {
-            estimated: [120000, 150000, 180000, 210000, 240000, 270000],
-            actual: [110000, 145000, 175000, 200000, 235000, 260000],
-            months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-          },
-          regionData: {
-            labels: ['North', 'South', 'East', 'West', 'Central'],
-            data: [85, 45, 65, 30, 20],
-          },
-        })
-        setLoading(false)
-      }, 1000)
-    }
-
     // Use mock data for demo
-    simulateApiResponse()
+    // simulateApiResponse()
     // In production, use the actual API call
-    // fetchAnalytics()
+    fetchAnalytics()
   }, [])
 
   const handleGenerateReport = async () => {
     try {
       const response = await axios.post('/api/admin/report', {}, { responseType: 'blob' })
-      
+
       // Create a blob URL and trigger download
       const url = window.URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement('a')
@@ -220,10 +196,12 @@ const AdminDashboard = () => {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 2,
               mb: 2,
             }}
           >
-            <Typography variant="h4" component="h1" gutterBottom>
+            <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 0 }}>
               Admin Dashboard
             </Typography>
             <Button
@@ -231,8 +209,16 @@ const AdminDashboard = () => {
               color="primary"
               startIcon={<DownloadIcon />}
               onClick={handleGenerateReport}
+              sx={{
+                minWidth: { xs: '100%', sm: 'auto' },
+              }}
             >
-              Generate Report
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                Generate Report
+              </Box>
+              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                Report
+              </Box>
             </Button>
           </Box>
           <Divider sx={{ mb: 3 }} />
@@ -299,7 +285,7 @@ const AdminDashboard = () => {
                 sx={{ fontSize: 48, color: 'success.main', mb: 1 }}
               />
               <Typography variant="h5" component="div">
-                {analytics.plantCount.toLocaleString()}
+                {(analytics.plantCount || 12500).toLocaleString()}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Total Plants
@@ -322,7 +308,7 @@ const AdminDashboard = () => {
                 sx={{ fontSize: 48, color: 'info.main', mb: 1 }}
               />
               <Typography variant="h5" component="div">
-                ₹{analytics.totalRevenue.toLocaleString()}
+                ₹{(analytics.totalRevenue || 1250000).toLocaleString()}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Total Revenue

@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
 
   // Set axios default header with token
   useEffect(() => {
-    console.log('Setting axios default header with token:', token)
+    // console.log('Setting axios default header with token:', token)
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
     } else {

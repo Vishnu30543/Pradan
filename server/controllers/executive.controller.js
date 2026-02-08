@@ -367,14 +367,41 @@ const getDashboard = async (req, res) => {
       });
     }
 
-    // Get requests from assigned farmers
-    const requests = await Request.find({
-      farmer: { $in: executive.assignedFarmers }
-    })
-      .populate('farmer', 'name villageName')
-      .sort({ createdAt: -1 });
+    const assignedFarmersIds = executive.assignedFarmers;
 
-    // Count requests by status
+    // Run independent queries in parallel
+    const [requestStats, recentRequests, incomeStats, farmerCount] = await Promise.all([
+      // 1. Get request counts by status
+      Request.aggregate([
+        { $match: { farmer: { $in: assignedFarmersIds } } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ]),
+
+      // 2. Get recent requests (only 5)
+      Request.find({ farmer: { $in: assignedFarmersIds } })
+        .populate('farmer', 'name villageName')
+        .sort({ createdAt: -1 })
+        .limit(5),
+
+      // 3. Get income statistics
+      Farmer.aggregate([
+        { $match: { _id: { $in: assignedFarmersIds } } },
+        {
+          $group: {
+            _id: null,
+            totalIncome: { $sum: '$income' },
+            totalEstimatedIncome: { $sum: '$estimatedIncome' },
+            avgIncome: { $avg: '$income' },
+            avgEstimatedIncome: { $avg: '$estimatedIncome' }
+          }
+        }
+      ]),
+
+      // 4. Get farmer count (could also use array length, but this is safer if array is large/not populated)
+      Promise.resolve(assignedFarmersIds.length)
+    ]);
+
+    // Format request counts
     const requestCounts = {
       pending: 0,
       'in-progress': 0,
@@ -382,35 +409,11 @@ const getDashboard = async (req, res) => {
       rejected: 0
     };
 
-    requests.forEach(request => {
-      if (request.status in requestCounts) {
-        requestCounts[request.status]++;
+    requestStats.forEach(stat => {
+      if (stat._id) {
+        requestCounts[stat._id] = stat.count;
       }
     });
-
-    // Get recent requests
-    const recentRequests = requests.slice(0, 5);
-
-    // Get farmer statistics
-    const farmerCount = executive.assignedFarmers.length;
-
-    // Get income statistics
-    const incomeStats = await Farmer.aggregate([
-      {
-        $match: {
-          _id: { $in: executive.assignedFarmers }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalIncome: { $sum: '$income' },
-          totalEstimatedIncome: { $sum: '$estimatedIncome' },
-          avgIncome: { $avg: '$income' },
-          avgEstimatedIncome: { $avg: '$estimatedIncome' }
-        }
-      }
-    ]);
 
     const incomeData = incomeStats.length > 0 ? incomeStats[0] : {
       totalIncome: 0,
@@ -427,7 +430,7 @@ const getDashboard = async (req, res) => {
         recentRequests,
         incomeData,
         // Recent SMS logs
-        recentSMS: executive.smsLogs.slice(0, 5)
+        recentSMS: executive.smsLogs ? executive.smsLogs.slice(0, 5) : []
       }
     });
   } catch (error) {

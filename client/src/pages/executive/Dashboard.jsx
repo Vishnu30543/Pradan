@@ -156,9 +156,9 @@ const ExecutiveDashboard = () => {
     }
 
     // Use mock data for demo
-    simulateApiResponse()
+    // simulateApiResponse()
     // In production, use the actual API call
-    // fetchDashboardData()
+    fetchDashboardData()
   }, [])
 
   // Chart configurations
@@ -275,8 +275,8 @@ const ExecutiveDashboard = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
+    <Box sx={{ p: { xs: 2, sm: 3 } }}>
+      <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
         Executive Dashboard
       </Typography>
 

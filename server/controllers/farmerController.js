@@ -11,10 +11,13 @@ const upload = require('../utils/fileUpload');
  */
 const getFarmerProfile = async (req, res) => {
   try {
-    // Get farmer with populated executive
-    const farmer = await Farmer.findById(req.user._id)
-      .select('-password')
-      .populate('assignedExecutive', 'name email phno');
+    // Get farmer and field status in parallel for better performance
+    const [farmer, fieldStatus] = await Promise.all([
+      Farmer.findById(req.user._id)
+        .select('-password')
+        .populate('assignedExecutive', 'name email phno'),
+      FieldStatus.findOne({ farmerID: req.user._id })
+    ]);
 
     if (!farmer) {
       return res.status(404).json({
@@ -22,9 +25,6 @@ const getFarmerProfile = async (req, res) => {
         message: 'Farmer not found'
       });
     }
-
-    // Get field status
-    const fieldStatus = await FieldStatus.findOne({ farmerID: farmer._id });
 
     res.status(200).json({
       success: true,
@@ -333,8 +333,12 @@ const getCarbonCredits = async (req, res) => {
  */
 const getFieldStatus = async (req, res) => {
   try {
-    // Find farmer
-    const farmer = await Farmer.findById(req.user._id);
+    // Run queries in parallel
+    const [farmer, fieldStatus] = await Promise.all([
+      Farmer.findById(req.user._id),
+      FieldStatus.findOne({ farmerID: req.user._id })
+    ]);
+
     if (!farmer) {
       return res.status(404).json({
         success: false,
@@ -342,24 +346,22 @@ const getFieldStatus = async (req, res) => {
       });
     }
 
-    // Get field status
-    let fieldStatus = await FieldStatus.findOne({ farmerID: farmer._id });
+    // Get field photos
+    const fieldPhotos = farmer.fieldPhotos || [];
 
-    // If no field status exists, create one
-    if (!fieldStatus) {
-      fieldStatus = await FieldStatus.create({
+    // If no field status exists, create one (this part remains sequential as it depends on check)
+    let finalFieldStatus = fieldStatus;
+    if (!finalFieldStatus) {
+      finalFieldStatus = await FieldStatus.create({
         farmerID: farmer._id,
         healthStatus: 'green',
         notes: 'Initial field status'
       });
     }
 
-    // Get field photos
-    const fieldPhotos = farmer.fieldPhotos || [];
-
     res.status(200).json({
       success: true,
-      fieldStatus,
+      fieldStatus: finalFieldStatus,
       fieldPhotos: fieldPhotos.slice(-5) // Get last 5 photos
     });
   } catch (error) {
@@ -545,14 +547,23 @@ const getFarmers = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    // Optimize: Fetch all field statuses in one query instead of N+1 queries
+    const farmerIds = farmersDoc.map(f => f._id);
+    const fieldStatuses = await FieldStatus.find({ farmerID: { $in: farmerIds } }).lean();
+
+    // Create a map for O(1) lookup
+    const statusMap = {};
+    fieldStatuses.forEach(status => {
+      statusMap[status.farmerID.toString()] = status;
+    });
+
     // Attach field status to each farmer
-    const farmers = await Promise.all(farmersDoc.map(async (farmer) => {
-      const status = await FieldStatus.findOne({ farmerID: farmer._id });
+    const farmers = farmersDoc.map(farmer => {
       return {
         ...farmer,
-        fieldStatus: status || { health: 'unknown' } // Default if null
+        fieldStatus: statusMap[farmer._id.toString()] || { healthStatus: 'unknown' }
       };
-    }));
+    });
 
     res.status(200).json({
       success: true,

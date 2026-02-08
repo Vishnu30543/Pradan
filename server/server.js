@@ -15,6 +15,10 @@ dotenv.config();
 // Initialize Express app
 const app = express();
 
+// Enable compression
+const compression = require('compression');
+app.use(compression());
+
 // Middleware
 app.use(cors());
 app.use(express.json());

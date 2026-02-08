@@ -15,43 +15,52 @@ const SchemeApplication = require('../models/SchemeApplication');
  */
 exports.getDashboardStats = async (req, res) => {
   try {
-    // Get counts
-    const farmerCount = await Farmer.countDocuments();
-    const executiveCount = await Executive.countDocuments();
-    
-    // Get total plants count
-    const farmers = await Farmer.find().select('plants');
-    let totalPlantsCount = 0;
-    farmers.forEach(farmer => {
-      if (farmer.plants && Array.isArray(farmer.plants)) {
-        totalPlantsCount += farmer.plants.length;
-      }
-    });
-    
-    // Get total and estimated income
-    const incomeData = await Farmer.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalIncome: { $sum: '$income' },
-          totalEstimatedIncome: { $sum: '$estimatedIncome' }
+    // Run all independent queries in parallel
+    const [
+      farmerCount,
+      executiveCount,
+      plantStats,
+      incomeData,
+      requestStats
+    ] = await Promise.all([
+      // 1. Farmer count
+      Farmer.countDocuments(),
+
+      // 2. Executive count
+      Executive.countDocuments(),
+
+      // 3. Total plants count via aggregation
+      Farmer.aggregate([
+        { $unwind: "$plants" },
+        { $count: "totalPlants" }
+      ]),
+
+      // 4. Income data
+      Farmer.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalIncome: { $sum: '$income' },
+            totalEstimatedIncome: { $sum: '$estimatedIncome' }
+          }
         }
-      }
+      ]),
+
+      // 5. Request stats
+      Request.aggregate([
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ])
     ]);
-    
+
+    const totalPlantsCount = plantStats.length > 0 ? plantStats[0].totalPlants : 0;
     const totalIncome = incomeData.length > 0 ? incomeData[0].totalIncome : 0;
     const totalEstimatedIncome = incomeData.length > 0 ? incomeData[0].totalEstimatedIncome : 0;
-    
-    // Get request statistics
-    const requestStats = await Request.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-    
+
     // Format request stats
     const requestCounts = {
       pending: 0,
@@ -59,26 +68,33 @@ exports.getDashboardStats = async (req, res) => {
       completed: 0,
       rejected: 0
     };
-    
+
     requestStats.forEach(stat => {
-      if (stat._id in requestCounts) {
+      if (stat._id) {
         requestCounts[stat._id] = stat.count;
       }
     });
-    
+
     res.status(200).json({
       success: true,
       data: {
         farmerCount,
         executiveCount,
-        totalPlantsCount,
-        totalIncome,
+        plantCount: totalPlantsCount,
+        totalRevenue: totalIncome,
         totalEstimatedIncome,
         requestCounts,
-        carbonCredits: {
-          total: 1250,
-          monthly: 125
+        // Mock chart data to satisfy frontend
+        incomeData: {
+          estimated: [120000, 150000, 180000, 210000, 240000, 270000],
+          actual: [110000, 145000, 175000, 200000, 235000, 260000],
+          months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
         },
+        regionData: {
+          labels: ['North', 'South', 'East', 'West', 'Central'],
+          data: [85, 45, 65, 30, 20]
+        },
+        carbonCredits: 1250,
         partnerCompanies: 8
       }
     });
@@ -108,7 +124,7 @@ exports.getRevenueAnalytics = async (req, res) => {
       { month: 'May', income: 16700, estimatedIncome: 19500 },
       { month: 'Jun', income: 18200, estimatedIncome: 21000 }
     ];
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -146,7 +162,7 @@ exports.getFarmerAnalytics = async (req, res) => {
       { $sort: { count: -1 } },
       { $limit: 10 }
     ]);
-    
+
     // Get farmer distribution by crop type (mock data for demo)
     const cropDistribution = [
       { crop: 'Rice', count: 45 },
@@ -155,7 +171,7 @@ exports.getFarmerAnalytics = async (req, res) => {
       { crop: 'Cotton', count: 22 },
       { crop: 'Pulses', count: 18 }
     ];
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -196,7 +212,7 @@ exports.getExecutiveAnalytics = async (req, res) => {
       },
       { $sort: { farmerCount: -1 } }
     ]);
-    
+
     // Get executive performance (mock data for demo)
     const executivePerformance = executiveData.slice(0, 5).map(exec => ({
       name: exec.name,
@@ -205,7 +221,7 @@ exports.getExecutiveAnalytics = async (req, res) => {
       requestsResolved: Math.floor(Math.random() * 50) + 10,
       avgResponseTime: Math.floor(Math.random() * 24) + 1 + ' hours'
     }));
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -240,7 +256,7 @@ exports.getRequestAnalytics = async (req, res) => {
         }
       }
     ]);
-    
+
     // Format request stats
     const requestByStatus = {
       pending: 0,
@@ -248,13 +264,13 @@ exports.getRequestAnalytics = async (req, res) => {
       completed: 0,
       rejected: 0
     };
-    
+
     requestStats.forEach(stat => {
       if (stat._id in requestByStatus) {
         requestByStatus[stat._id] = stat.count;
       }
     });
-    
+
     // Get request statistics by type (mock data for demo)
     const requestByType = [
       { type: 'Technical Support', count: 35 },
@@ -263,7 +279,7 @@ exports.getRequestAnalytics = async (req, res) => {
       { type: 'Equipment', count: 15 },
       { type: 'Other', count: 10 }
     ];
-    
+
     // Get monthly request trends (mock data for demo)
     const monthlyTrends = [
       { month: 'Jan', requests: 25 },
@@ -273,7 +289,7 @@ exports.getRequestAnalytics = async (req, res) => {
       { month: 'May', requests: 42 },
       { month: 'Jun', requests: 38 }
     ];
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -310,7 +326,7 @@ exports.getCarbonCreditAnalytics = async (req, res) => {
       { month: 'May', credits: 240 },
       { month: 'Jun', credits: 260 }
     ];
-    
+
     const creditsByRegion = [
       { region: 'North', credits: 450 },
       { region: 'South', credits: 380 },
@@ -318,7 +334,7 @@ exports.getCarbonCreditAnalytics = async (req, res) => {
       { region: 'West', credits: 290 },
       { region: 'Central', credits: 210 }
     ];
-    
+
     res.status(200).json({
       success: true,
       data: {
